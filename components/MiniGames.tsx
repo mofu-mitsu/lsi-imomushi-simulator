@@ -953,7 +953,7 @@ function WhackACaterpillarGame({ onFinish }: { onFinish: (score: number) => void
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(20);
   const [isGameOver, setIsGameOver] = useState(false);
-  const [splats, setSplats] = useState<{ id: number; x: number; y: number; text: string; isDarling?: boolean }[]>([]);
+  const [splats, setSplats] = useState<{ id: number; holeIndex: number; text: string; isDarling?: boolean }[]>([]);
   const [holes, setHoles] = useState<HoleState[]>([
     { id: 0, type: 'none' },
     { id: 1, type: 'none' },
@@ -1029,23 +1029,19 @@ function WhackACaterpillarGame({ onFinish }: { onFinish: (score: number) => void
     const target = holes[idx];
     if (target.type === 'none' || target.isHit) return;
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
     if (target.type === 'caterpillar') {
       // Hit Caterpillar!
       setScore(s => s + 1);
       const scream = target.scream || 'ぐしゃあっ！';
       
-      setSplats(s => [...s, { id: Date.now() + Math.random(), x, y, text: scream, isDarling: false }]);
+      setSplats(s => [...s, { id: Date.now() + Math.random(), holeIndex: idx, text: scream, isDarling: false }]);
       
       // Mark hole as hit
       setHoles(prev => prev.map((h, i) => i === idx ? { ...h, isHit: true, type: 'none' } : h));
     } else if (target.type === 'darling') {
       // Trap! Darling-chan hit
       setScore(s => Math.max(0, s - 5));
-      setSplats(s => [...s, { id: Date.now() + Math.random(), x, y, text: '「ダーリン♡ なにするん……（大激怒）」', isDarling: true }]);
+      setSplats(s => [...s, { id: Date.now() + Math.random(), holeIndex: idx, text: '「ダーリン♡ なにするん……（大激怒）」', isDarling: true }]);
       setHoles(prev => prev.map((h, i) => i === idx ? { ...h, isHit: true, type: 'none' } : h));
     }
 
@@ -1078,65 +1074,67 @@ function WhackACaterpillarGame({ onFinish }: { onFinish: (score: number) => void
       {/* 3x3 Whack Grid */}
       <div className="relative w-full h-[320px] bg-stone-800 border-3 border-stone-700 rounded-2xl p-4 grid grid-cols-3 gap-3 shadow-inner select-none overflow-hidden">
         
-        {holes.map((hole, idx) => (
-          <div
-            key={hole.id}
-            onClick={(e) => handleWhack(idx, e)}
-            className="relative bg-stone-900 border-2 border-stone-700 rounded-2xl flex items-center justify-center cursor-pointer overflow-hidden shadow-inner active:bg-stone-950 transition-colors"
-          >
-            {/* Hole Ground Pattern */}
-            <div className="absolute inset-x-2 bottom-1 h-3 bg-stone-950/80 rounded-full blur-xs" />
+        {holes.map((hole, idx) => {
+          const currentSplats = splats.filter(s => s.holeIndex === idx);
+          return (
+            <div
+              key={hole.id}
+              onClick={(e) => handleWhack(idx, e)}
+              className="relative bg-stone-900 border-2 border-stone-700 rounded-2xl flex items-center justify-center cursor-pointer overflow-visible shadow-inner active:bg-stone-950 transition-colors"
+            >
+              {/* Hole Ground Pattern */}
+              <div className="absolute inset-x-2 bottom-1 h-3 bg-stone-950/80 rounded-full blur-xs pointer-events-none" />
 
-            {/* Target Actor */}
-            <AnimatePresence>
-              {hole.type === 'caterpillar' && (
+              {/* Target Actor */}
+              <AnimatePresence>
+                {hole.type === 'caterpillar' && (
+                  <motion.div
+                    initial={{ y: 50, scale: 0.5, opacity: 0 }}
+                    animate={{ y: 0, scale: 1, opacity: 1 }}
+                    exit={{ y: 50, scale: 0.5, opacity: 0 }}
+                    className="text-5xl sm:text-6xl drop-shadow-md select-none transform hover:scale-110 active:scale-95 transition-transform"
+                  >
+                    🐛
+                  </motion.div>
+                )}
+
+                {hole.type === 'darling' && (
+                  <motion.div
+                    initial={{ y: 50, scale: 0.5, opacity: 0 }}
+                    animate={{ y: 0, scale: 1, opacity: 1 }}
+                    exit={{ y: 50, scale: 0.5, opacity: 0 }}
+                    className="relative flex flex-col items-center select-none"
+                  >
+                    <span className="text-5xl sm:text-6xl drop-shadow-md animate-bounce">🥺</span>
+                    <span className="text-[9px] bg-rose-600 text-white font-black px-1.5 py-0.2 rounded-full absolute -bottom-1 whitespace-nowrap shadow-xs">
+                      罠！
+                    </span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Speech bubble precisely at this hole */}
+              {currentSplats.map(s => (
                 <motion.div
-                  initial={{ y: 50, scale: 0.5, opacity: 0 }}
-                  animate={{ y: 0, scale: 1, opacity: 1 }}
-                  exit={{ y: 50, scale: 0.5, opacity: 0 }}
-                  className="text-5xl sm:text-6xl drop-shadow-md select-none transform hover:scale-110 active:scale-95 transition-transform"
+                  key={s.id}
+                  initial={{ scale: 0.4, opacity: 1, y: 10 }}
+                  animate={{ scale: 1.05, opacity: 0, y: -45 }}
+                  transition={{ duration: 1.1 }}
+                  className={`absolute pointer-events-none z-50 px-2.5 py-1 rounded-xl font-black text-xs shadow-2xl border-2 whitespace-nowrap -top-3 left-1/2 -translate-x-1/2 ${
+                    s.isDarling 
+                      ? 'bg-rose-900 text-rose-100 border-rose-400' 
+                      : 'bg-emerald-800 text-emerald-100 border-emerald-400'
+                  }`}
                 >
-                  🐛
+                  {s.text}
+                  {!s.isDarling && (
+                    <span className="ml-1 text-amber-300">✨ Ti散乱！</span>
+                  )}
                 </motion.div>
-              )}
-
-              {hole.type === 'darling' && (
-                <motion.div
-                  initial={{ y: 50, scale: 0.5, opacity: 0 }}
-                  animate={{ y: 0, scale: 1, opacity: 1 }}
-                  exit={{ y: 50, scale: 0.5, opacity: 0 }}
-                  className="relative flex flex-col items-center select-none"
-                >
-                  <span className="text-5xl sm:text-6xl drop-shadow-md animate-bounce">🥺</span>
-                  <span className="text-[9px] bg-rose-600 text-white font-black px-1.5 py-0.2 rounded-full absolute -bottom-1 whitespace-nowrap shadow-xs">
-                    罠！
-                  </span>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        ))}
-
-        {/* Splat / Particle Effects */}
-        {splats.map(s => (
-          <motion.div
-            key={s.id}
-            initial={{ scale: 0.5, opacity: 1, y: 0 }}
-            animate={{ scale: 1.2, opacity: 0, y: -40 }}
-            transition={{ duration: 1 }}
-            className={`absolute pointer-events-none z-50 px-3 py-1.5 rounded-xl font-black text-xs shadow-2xl border-2 whitespace-nowrap ${
-              s.isDarling 
-                ? 'bg-rose-900 text-rose-100 border-rose-400' 
-                : 'bg-emerald-800 text-emerald-100 border-emerald-400'
-            }`}
-            style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
-          >
-            {s.text}
-            {!s.isDarling && (
-              <span className="ml-1 text-amber-300">✨ Ti構造データ飛散！</span>
-            )}
-          </motion.div>
-        ))}
+              ))}
+            </div>
+          );
+        })}
 
       </div>
     </div>

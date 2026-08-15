@@ -28,7 +28,9 @@ import {
   Wind,
   Home,
   ShieldAlert,
-  AlertTriangle
+  AlertTriangle,
+  Menu,
+  Calendar
 } from 'lucide-react';
 import CaterpillarRoom, { AVAILABLE_FURNITURE, DAILY_SCHEDULE, getCurrentSchedule, FurnitureItem } from './CaterpillarRoom';
 import MiniGames from './MiniGames';
@@ -62,7 +64,7 @@ export const STAGES: StageInfo[] = [
     name: 'LSI芋虫（幼虫）', 
     badge: 'STAGE 0', 
     threshold: 0, 
-    desc: '境界線をミリ単位で確認し、テリトリーの規律を監視している。',
+    desc: '境界線をミリ単位で確認し、テリトリーの規律を監視している基本幼虫。',
     visual: '🐛',
     disciplineTitle: '【初期段階】不可侵領土の確保と境界線監査',
     flavorQuote: '「ミリ単位の狂いも許さん。ここが我が不可侵領土だ」',
@@ -73,48 +75,48 @@ export const STAGES: StageInfo[] = [
     name: '規律の幼虫・課長級', 
     badge: 'STAGE 1', 
     threshold: 100, 
-    desc: '毎朝の構造化目標を強制提示し、エサの消化ペースを厳格に指示する。',
+    desc: '毎朝の構造化目標を強制提示し、エサの消化ペースを厳格に指示する組織統制型幼虫。',
     visual: '🐛',
     disciplineTitle: '【物理統制】Se空間支配と消化ノルマ厳守',
     flavorQuote: '「モゾ……朝会プロトコル開始。本日の消化ノルマを厳格に履行せよ」',
-    hint: 'EXP 100 達成で羽化準備に入ります。'
+    hint: 'EXP 100 達成で規律が強化されます。'
   },
   { 
     stageNumber: 2,
-    name: '鋼鉄のシェルターさなぎ', 
-    badge: 'STAGE 2 🛡️', 
+    name: '法務統制芋虫（Ti-Se監査型）', 
+    badge: 'STAGE 2', 
     threshold: 250, 
-    desc: '外殻を高密度合金で固めた不可侵の繭。内部で論理構造の超圧縮再構築を行う。',
-    visual: '🛡️',
-    disciplineTitle: '【要塞化】不可侵シェルターによる完全防衛と内部構造化',
-    flavorQuote: '「外部のノイズは全て遮断した。我が繭は難攻不落の要塞である」',
-    hint: 'EXP 250 達成でさなぎ（防壁シェルター）に変態します。'
+    desc: '飼育員のクリック頻度・マウス軌跡を暗号化監査し、利用規約違反を摘発する法務特化幼虫。',
+    visual: '🐛',
+    disciplineTitle: '【法務統制】ケージ規約第142条の厳格運用と行動ログ暗号化',
+    flavorQuote: '「飼育員の全操作ログをハッシュ化して保管中だ。規約違反は即座に摘発する」',
+    hint: 'EXP 250 達成で法務統制型幼虫へ進化します。'
   },
   { 
     stageNumber: 3,
-    name: '立方体クリスタルさなぎ', 
-    badge: 'STAGE 3 💎', 
+    name: '直角幾何学エリート芋虫', 
+    badge: 'STAGE 3', 
     threshold: 450, 
-    desc: '全方向が完全な直角と平面で構成された水晶の蛹。光の屈折率まで規律通りに制御。',
-    visual: '💎',
-    disciplineTitle: '【論理結晶】直角幾何学と多面体屈折率の完全制御',
-    flavorQuote: '「歪みは分子レベルで排除された。完全なる直角幾何学の結晶体を見よ」',
-    hint: 'EXP 450 達成でクリスタル結晶さなぎへ進化します。'
+    desc: '全方向の空間座標を完全な直角と直線で再定義し、外骨格の強度を極限まで高めた精鋭幼虫。',
+    visual: '🐛',
+    disciplineTitle: '【空間幾何】直角グリッドによる領域完全制圧と骨格強化',
+    flavorQuote: '「歪みは分子レベルで排除された。完全なる直角幾何学の歩行を見よ」',
+    hint: 'EXP 450 達成で直角幾何学エリート幼虫へ進化します。'
   },
   { 
     stageNumber: 4,
-    name: '空間統制の成熟蛹', 
-    badge: 'STAGE 4 💠', 
+    name: '立方体クリスタルさなぎ（完全防壁シェルター）', 
+    badge: 'STAGE 4 🛡️', 
     threshold: 700, 
-    desc: '羽化直前の超高密度エネルギー蛹。ケージ全域の重力場と空間座標をすでに掌握している。',
-    visual: '💠',
-    disciplineTitle: '【覚醒前夜】領域全域の座標掌握と羽化カウントダウン',
-    flavorQuote: '「ケージの全座標データは掌握済みだ。完全羽化の時を待て」',
-    hint: 'EXP 700 達成で成熟蛹へ覚醒します。'
+    desc: '外殻を高密度合金と水晶で固めた不可侵の繭。内部で蝶への論理構造の超圧縮再構築を行う。',
+    visual: '🛡️',
+    disciplineTitle: '【要塞蛹化】不可侵シェルターによる完全防衛と内部構造化',
+    flavorQuote: '「外部のノイズは全て遮断した。我が繭は難攻不落の要塞である」',
+    hint: 'EXP 700 達成で立方体クリスタルさなぎへ変態します。'
   },
   { 
     stageNumber: 5,
-    name: '構造化アゲハ完全体', 
+    name: '構造化アゲハ完全体（領域展開・絶対秩序蝶）', 
     badge: 'MAX STAGE 🦋', 
     threshold: 1000, 
     desc: '領域展開完了。ケージの概念を超越した完全な論理と物理の統制蝶へ羽化した。',
@@ -140,9 +142,11 @@ export default function Dashboard() {
   // Modals
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isEncyclopediaOpen, setIsEncyclopediaOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [authErrorMsg, setAuthErrorMsg] = useState<string | null>(null);
 
   // Editing profile temporary states
   const [tempName, setTempName] = useState('');
@@ -187,7 +191,7 @@ export default function Dashboard() {
             sprayCount: parsed.sprayCount !== undefined ? parsed.sprayCount : 0,
             daycareUntil: parsed.daycareUntil || null,
             darlingIncident: parsed.darlingIncident || false,
-            darlingMoodTarget: parsed.darlingMoodTarget || Math.floor(Math.random() * 100) + 1
+            darlingMoodTarget: parsed.darlingMoodTarget || (Math.floor(Math.random() * 990) + 10) / 10
           };
         }
       } catch (e) {
@@ -210,24 +214,28 @@ export default function Dashboard() {
   // Check 3-day inactivity (72 hours) for Darling-chan incident
   useEffect(() => {
     if (!mounted) return;
-    const now = Date.now();
-    const lastActivity = new Date(data.lastFedAt || data.lastMessageAt || 0).getTime();
-    const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+    const timeoutId = setTimeout(() => {
+      const now = Date.now();
+      const lastActivity = new Date(data.lastFedAt || data.lastMessageAt || 0).getTime();
+      const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
 
-    // Check if daycare is currently active
-    const isDaycareActive = data.daycareUntil && new Date(data.daycareUntil).getTime() > now;
+      // Check if daycare is currently active
+      const isDaycareActive = data.daycareUntil && new Date(data.daycareUntil).getTime() > now;
 
-    if (!isDaycareActive && (now - lastActivity > threeDaysMs) && !data.darlingIncident) {
-      setData(prev => ({
-        ...prev,
-        darlingIncident: true,
-        darlingMoodTarget: Math.floor(Math.random() * 100) + 1,
-        logs: [
-          { time: new Date().toLocaleTimeString(), text: '🚨【物理崩壊インシデント】3日間放置されたため、ILIダーリンちゃんにケージを占拠された！' },
-          ...prev.logs.slice(0, 19)
-        ]
-      }));
-    }
+      if (!isDaycareActive && (now - lastActivity > threeDaysMs) && !data.darlingIncident) {
+        setData(prev => ({
+          ...prev,
+          darlingIncident: true,
+          darlingMoodTarget: (Math.floor(Math.random() * 990) + 10) / 10,
+          logs: [
+            { time: new Date().toLocaleTimeString(), text: '🚨【物理崩壊インシデント】3日間放置されたため、ILIダーリンちゃんにケージを占拠された！' },
+            ...prev.logs.slice(0, 19)
+          ]
+        }));
+      }
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
   }, [mounted, data.lastFedAt, data.lastMessageAt, data.daycareUntil, data.darlingIncident]);
 
   // Auth state change & Automatic multi-account GAS synchronization
@@ -277,7 +285,7 @@ export default function Dashboard() {
   const triggerGasSync = useCallback(async (currentData: CaterpillarData) => {
     setSyncStatus('syncing');
     try {
-      const res = await syncWithGas(currentData.gasWebAppUrl, currentData);
+      const res = await syncWithGas(DEFAULT_GAS_URL, currentData);
       if (res.success) {
         setSyncStatus('synced');
         setTimeout(() => setSyncStatus('idle'), 3000);
@@ -292,6 +300,7 @@ export default function Dashboard() {
   // Google Sign In
   const handleGoogleLogin = async () => {
     try {
+      setAuthErrorMsg(null);
       const result = await signInWithPopup(auth, googleAuthProvider);
       const user = result.user;
       if (user) {
@@ -326,8 +335,13 @@ export default function Dashboard() {
           });
         }
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Google login error:', e);
+      if (e?.code === 'auth/unauthorized-domain') {
+        setAuthErrorMsg('※ 現在のドメインはFirebase認証の承認リスト外です。ローカルストレージ保存モードにて全機能をご利用いただけます。');
+      } else {
+        setAuthErrorMsg('ログイン処理で問題が発生しました。ローカル保存モードで遊べます。');
+      }
     }
   };
 
@@ -499,7 +513,7 @@ export default function Dashboard() {
     });
   }, [data.points, triggerGasSync]);
 
-  // Shop purchase: Daycare (50pt for 24h protection)
+  // Shop purchase: Daycare (50pt for 24h protection - cumulative)
   const handleBuyDaycare = useCallback(() => {
     const cost = 50;
     if (data.points < cost) {
@@ -507,15 +521,20 @@ export default function Dashboard() {
       return;
     }
 
-    const next24h = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    setClerkQuote('「『芋虫保育園 24時間パス』を発行しました。期間中は放置してもダーリンちゃんに乗っ取られません。」');
+    const now = Date.now();
+    const currentUntil = data.daycareUntil ? new Date(data.daycareUntil).getTime() : 0;
+    const baseTime = currentUntil > now ? currentUntil : now;
+    const newUntil = new Date(baseTime + 24 * 60 * 60 * 1000).toISOString();
+    const hoursLeft = Math.round((new Date(newUntil).getTime() - now) / (1000 * 60 * 60));
+
+    setClerkQuote(`「『芋虫保育園 24時間パス』を発行しました（累計保護残り: 約${hoursLeft}時間）。期間中は放置してもダーリンちゃんに乗っ取られません。」`);
     setData(prev => {
       const updated: CaterpillarData = {
         ...prev,
         points: prev.points - cost,
-        daycareUntil: next24h,
+        daycareUntil: newUntil,
         logs: [
-          { time: new Date().toLocaleTimeString(), text: '芋虫保育園（24時間保護パス）を購入' },
+          { time: new Date().toLocaleTimeString(), text: `芋虫保育園（+24h累積保護）を購入 (残り約${hoursLeft}時間)` },
           ...prev.logs.slice(0, 19)
         ]
       };
@@ -523,7 +542,7 @@ export default function Dashboard() {
       triggerGasSync(updated);
       return updated;
     });
-  }, [data.points, triggerGasSync]);
+  }, [data.daycareUntil, data.points, triggerGasSync]);
 
   // Use spray handler
   const handleUseSpray = useCallback(() => {
@@ -571,15 +590,6 @@ export default function Dashboard() {
       }
     });
   }, [triggerGasSync]);
-
-  // Trigger Darling Test
-  const handleTestDarlingTrigger = () => {
-    setData(prev => ({
-      ...prev,
-      darlingIncident: true,
-      darlingMoodTarget: Math.floor(Math.random() * 100) + 1
-    }));
-  };
 
   // Chat Submission
   const handleSendChat = async () => {
@@ -654,68 +664,86 @@ export default function Dashboard() {
     <div className="min-h-screen bg-stone-100 text-stone-900 flex flex-col items-center justify-start p-3 sm:p-5">
       
       {/* Outer Constrained Container */}
-      <div className="w-full max-w-4xl flex flex-col gap-4">
+      <div className="w-full max-w-4xl flex flex-col gap-3 sm:gap-4">
 
-        {/* Top App Header */}
-        <header className="bg-white border-2 border-stone-300 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
-          
-          {/* Logo & Subtitle */}
-          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-xl bg-emerald-800 text-white flex items-center justify-center text-2xl shadow-xs">
-                🐛
-              </div>
-              <div>
-                <h1 className="text-base sm:text-lg font-black tracking-tight text-emerald-950 flex items-center gap-2">
-                  <span>LSI芋虫育成シミュレーター</span>
-                  <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
-                    Ti-Se / 1F
-                  </span>
-                </h1>
-                <p className="text-[11px] text-stone-500 font-medium">
-                  規律と境界線を愛する不器用な論理芋虫の飼育・観察記録
-                </p>
-              </div>
+        {/* Auth notice banner if unauthorized domain or error */}
+        {authErrorMsg && (
+          <div className="bg-amber-50 border border-amber-300 rounded-2xl p-3 text-xs text-amber-900 flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>{authErrorMsg}</span>
             </div>
-
-            {/* Help Button (Mobile) */}
             <button
-              onClick={() => setIsHelpModalOpen(true)}
-              className="sm:hidden p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100"
-              title="遊び方"
+              onClick={() => setAuthErrorMsg(null)}
+              className="text-amber-700 hover:text-amber-950 font-bold ml-2 cursor-pointer"
             >
-              <HelpCircle className="w-4 h-4" />
+              <X className="w-4 h-4" />
             </button>
           </div>
+        )}
 
-          {/* User Auth & Actions */}
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+        {/* Top App Header */}
+        <header className="bg-white border-2 border-stone-300 rounded-2xl p-3.5 sm:p-4 shadow-sm flex flex-row items-center justify-between gap-3">
+          
+          {/* Logo & Subtitle */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-xl bg-emerald-800 text-white flex items-center justify-center text-2xl shadow-xs shrink-0">
+              🐛
+            </div>
+            <div>
+              <h1 className="text-base sm:text-lg font-black tracking-tight text-emerald-950 flex items-center gap-2">
+                <span>LSI芋虫育成シミュレーター</span>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                  Ti-Se / 1F
+                </span>
+              </h1>
+              <p className="text-[11px] text-stone-500 font-medium line-clamp-1">
+                規律と境界線を愛する不器用な論理芋虫の飼育・観察記録
+              </p>
+            </div>
+          </div>
+
+          {/* Desktop Navigation & Actions */}
+          <div className="hidden md:flex items-center gap-2 shrink-0">
             
-            {/* How to play Button (Desktop) */}
+            {/* How to play Button */}
             <button
               onClick={() => setIsHelpModalOpen(true)}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 text-xs font-bold transition shadow-xs cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 text-xs font-bold transition shadow-xs cursor-pointer"
             >
               <HelpCircle className="w-3.5 h-3.5" />
-              <span>📖 遊び方</span>
+              <span>遊び方</span>
             </button>
 
-            {/* Encyclopedia Button (Desktop) */}
+            {/* Encyclopedia Button */}
             <button
               onClick={() => setIsEncyclopediaOpen(true)}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-800 text-xs font-bold transition shadow-xs cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-800 text-xs font-bold transition shadow-xs cursor-pointer"
             >
               <BookOpen className="w-3.5 h-3.5" />
-              <span>形態図鑑 ({data.discoveredStages?.length || 1}/{STAGES.length})</span>
+              <span>図鑑 ({data.discoveredStages?.length || 1}/{STAGES.length})</span>
             </button>
 
-            {/* Settings Button */}
+            {/* Schedule Button */}
             <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-700 transition cursor-pointer"
-              title="GAS・飼育員設定"
+              onClick={() => setIsScheduleModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-800 text-xs font-bold transition shadow-xs cursor-pointer"
             >
-              <Settings className="w-4 h-4" />
+              <Calendar className="w-3.5 h-3.5" />
+              <span>24h予定</span>
+            </button>
+
+            {/* Profile Button */}
+            <button
+              onClick={() => {
+                setTempName(data.ownerName);
+                setTempType(data.selfType);
+                setIsProfileModalOpen(true);
+              }}
+              className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-700 transition cursor-pointer"
+              title="飼育員プロフィール"
+            >
+              <Edit3 className="w-4 h-4" />
             </button>
 
             {/* Google Account Button */}
@@ -723,7 +751,7 @@ export default function Dashboard() {
               <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 pl-2.5 pr-1.5 py-1 rounded-xl">
                 <span className="text-xs font-black text-emerald-900 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>{currentUser.displayName || data.ownerName}</span>
+                  <span className="max-w-[80px] truncate">{currentUser.displayName || data.ownerName}</span>
                 </span>
                 <button
                   onClick={handleGoogleLogout}
@@ -753,6 +781,18 @@ export default function Dashboard() {
             </button>
 
           </div>
+
+          {/* Mobile Hamburger Menu Button */}
+          <div className="flex md:hidden items-center gap-1.5">
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-800 transition cursor-pointer"
+              aria-label="メニューを開く"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          </div>
+
         </header>
 
         {/* Global Navigation Tabs */}
@@ -863,10 +903,10 @@ export default function Dashboard() {
                     </span>
                   ) : null}
 
-                  {data.daycareUntil && new Date(data.daycareUntil).getTime() > Date.now() ? (
+                  {data.daycareUntil && new Date(data.daycareUntil).getTime() > new Date(data.lastFedAt || 0).getTime() ? (
                     <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-1 rounded-lg flex items-center gap-1">
                       <Home className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>保育園保護中（24h）</span>
+                      <span>保育園保護中（24h+）</span>
                     </span>
                   ) : null}
                 </div>
@@ -890,19 +930,6 @@ export default function Dashboard() {
                     <Edit3 className="w-3 h-3" />
                     <span>変更</span>
                   </button>
-                </div>
-
-                {/* Test Darling Incident Trigger Button */}
-                <div className="pt-2 border-t border-stone-200 flex items-center justify-between">
-                  <button
-                    onClick={handleTestDarlingTrigger}
-                    className="text-[11px] bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition active:scale-95"
-                    title="3日放置インシデントの演出をテスト起動します"
-                  >
-                    <AlertTriangle className="w-3 h-3 text-rose-500" />
-                    <span>🧪 ダーリンちゃん襲来テスト</span>
-                  </button>
-                  <span className="text-[10px] text-stone-400">動作検証用</span>
                 </div>
 
               </div>
@@ -948,7 +975,7 @@ export default function Dashboard() {
               </span>
             </div>
 
-            <div className="min-h-[460px] w-full flex flex-col">
+            <div className="min-h-[440px] w-full flex flex-col">
               <CaterpillarRoom 
                 onFeed={handleFeed} 
                 stage={data.stage} 
@@ -961,6 +988,55 @@ export default function Dashboard() {
                 darlingMoodTarget={data.darlingMoodTarget}
                 onResolveDarlingIncident={handleResolveDarlingIncident}
               />
+            </div>
+
+            {/* 24h Daily Schedule Timetable */}
+            <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs sm:text-sm font-black text-stone-800 flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-emerald-700" />
+                  <span>24時間 規律行動スケジュール一覧</span>
+                </h3>
+                <span className="text-[11px] text-stone-500 font-medium">
+                  現在時刻: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                {DAILY_SCHEDULE.map((item, idx) => {
+                  const currentHour = new Date().getHours();
+                  const isCurrent = currentHour >= item.startHour && currentHour < item.endHour;
+
+                  return (
+                    <div
+                      key={idx}
+                      className={`p-3 rounded-xl border-2 transition-all flex flex-col gap-1 ${
+                        isCurrent
+                          ? 'bg-emerald-50 border-emerald-500 shadow-sm ring-2 ring-emerald-400/30'
+                          : 'bg-white border-stone-200 opacity-80'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-mono font-bold text-stone-500">
+                          {String(item.startHour).padStart(2, '0')}:00 - {String(item.endHour).padStart(2, '0')}:00
+                        </span>
+                        {isCurrent && (
+                          <span className="text-[10px] font-black bg-emerald-600 text-white px-2 py-0.2 rounded-full animate-pulse">
+                            ● 実施中
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-black text-xs text-stone-900 flex items-center gap-1">
+                        <span>{item.emoji}</span>
+                        <span>{item.title}</span>
+                      </h4>
+                      <p className="text-[11px] text-stone-600 leading-tight">
+                        {item.action}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
@@ -1400,7 +1476,10 @@ export default function Dashboard() {
               exit={{ scale: 0.95, opacity: 0 }}
               className="bg-white border-2 border-stone-300 rounded-3xl p-6 max-w-sm w-full shadow-2xl flex flex-col gap-4"
             >
-              <h3 className="text-base font-black text-stone-900">飼育員プロファイルの編集</h3>
+              <h3 className="text-base font-black text-stone-900 flex items-center gap-2">
+                <Edit3 className="w-5 h-5 text-emerald-800" />
+                <span>飼育員プロファイルの編集</span>
+              </h3>
               
               <div className="flex flex-col gap-3 text-xs">
                 <div>
@@ -1452,65 +1531,207 @@ export default function Dashboard() {
       </AnimatePresence>
 
       {/* -------------------------------------------------------------
-          MODAL: SETTINGS & GAS SYNC
+          MODAL: 24-HOUR SCHEDULE VIEW
       ------------------------------------------------------------- */}
       <AnimatePresence>
-        {isSettingsOpen && (
+        {isScheduleModalOpen && (
           <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white border-2 border-stone-300 rounded-3xl p-6 max-w-md w-full shadow-2xl flex flex-col gap-4"
+              className="bg-white border-2 border-stone-300 rounded-3xl p-6 max-w-lg w-full shadow-2xl flex flex-col gap-4 max-h-[85vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between border-b border-stone-200 pb-3">
                 <h3 className="text-base font-black text-stone-900 flex items-center gap-2">
-                  <Settings className="w-5 h-5 text-stone-700" />
-                  <span>GAS同期 & 飼育設定</span>
+                  <Calendar className="w-5 h-5 text-emerald-800" />
+                  <span>24時間 規律行動スケジュール</span>
                 </h3>
                 <button 
-                  onClick={() => setIsSettingsOpen(false)}
+                  onClick={() => setIsScheduleModalOpen(false)}
                   className="p-1 rounded-lg text-stone-400 hover:text-stone-700 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="flex flex-col gap-3 text-xs">
-                <div className="bg-stone-50 border border-stone-200 p-3 rounded-xl">
-                  <label className="font-bold text-stone-700 block mb-1">GAS WebアプリURL</label>
-                  <p className="text-[11px] text-stone-500 mb-2 font-mono break-all">
-                    {data.gasWebAppUrl || DEFAULT_GAS_URL}
-                  </p>
-                  <button
-                    onClick={() => triggerGasSync(data)}
-                    disabled={syncStatus === 'syncing'}
-                    className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer shadow-xs"
-                  >
-                    <RotateCcw className={`w-3.5 h-3.5 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
-                    <span>{syncStatus === 'syncing' ? '同期中……' : '今すぐGASと完全同期'}</span>
-                  </button>
-                  {syncStatus === 'synced' && (
-                    <p className="text-[11px] text-emerald-600 font-bold mt-1 text-center">
-                      ✓ スプレッドシート同期に成功しました！
-                    </p>
-                  )}
-                </div>
+              <p className="text-xs text-stone-500">
+                LSI芋虫は厳格なタイムテーブルに従って生息しています。
+              </p>
 
-                <div className="bg-stone-50 border border-stone-200 p-3 rounded-xl">
-                  <h4 className="font-bold text-stone-700 mb-1">画像アセット管理</h4>
-                  <p className="text-[11px] text-stone-500 leading-relaxed">
-                    店員画像は <code className="bg-stone-200 px-1 py-0.5 rounded text-stone-800 font-mono">/public/images/staff.png</code> を自動読み込みします。
-                  </p>
-                </div>
+              <div className="flex flex-col gap-2">
+                {DAILY_SCHEDULE.map((item, idx) => {
+                  const currentHour = new Date().getHours();
+                  const isCurrent = currentHour >= item.startHour && currentHour < item.endHour;
+
+                  return (
+                    <div
+                      key={idx}
+                      className={`p-3 rounded-2xl border-2 transition-all flex items-start justify-between gap-3 ${
+                        isCurrent
+                          ? 'bg-emerald-50 border-emerald-500 shadow-sm'
+                          : 'bg-stone-50 border-stone-200 opacity-90'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="text-2xl shrink-0 mt-0.5">{item.emoji}</div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-black text-xs sm:text-sm text-stone-900">
+                              {item.title}
+                            </h4>
+                            {isCurrent && (
+                              <span className="text-[10px] font-black bg-emerald-600 text-white px-2 py-0.2 rounded-full animate-pulse">
+                                ● 実施中
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-stone-600 mt-0.5">
+                            {item.action}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-mono font-bold text-stone-500 shrink-0">
+                        {String(item.startHour).padStart(2, '0')}:00 - {String(item.endHour).padStart(2, '0')}:00
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
 
               <button
-                onClick={() => setIsSettingsOpen(false)}
-                className="w-full bg-stone-800 hover:bg-stone-700 text-white font-bold py-2.5 rounded-xl transition text-xs cursor-pointer shadow-xs"
+                onClick={() => setIsScheduleModalOpen(false)}
+                className="w-full bg-stone-800 hover:bg-stone-700 text-white font-bold py-2.5 rounded-xl transition text-xs cursor-pointer shadow-xs mt-2"
               >
                 閉じる
               </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* -------------------------------------------------------------
+          MODAL: MOBILE HAMBURGER DRAWER
+      ------------------------------------------------------------- */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex justify-end">
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="bg-white w-72 h-full p-5 shadow-2xl flex flex-col gap-4 justify-between"
+            >
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-stone-200 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🐛</span>
+                    <span className="font-black text-sm text-stone-900">メニュー</span>
+                  </div>
+                  <button 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="p-1 rounded-lg text-stone-400 hover:text-stone-700 cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      setIsHelpModalOpen(true);
+                    }}
+                    className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-stone-100 text-stone-800 text-xs font-bold text-left cursor-pointer"
+                  >
+                    <HelpCircle className="w-4 h-4 text-emerald-700" />
+                    <span>📖 遊び方・ルール</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      setIsEncyclopediaOpen(true);
+                    }}
+                    className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-stone-100 text-stone-800 text-xs font-bold text-left cursor-pointer"
+                  >
+                    <BookOpen className="w-4 h-4 text-emerald-700" />
+                    <span>📚 形態図鑑 ({data.discoveredStages?.length || 1}/{STAGES.length})</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      setIsScheduleModalOpen(true);
+                    }}
+                    className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-stone-100 text-stone-800 text-xs font-bold text-left cursor-pointer"
+                  >
+                    <Calendar className="w-4 h-4 text-emerald-700" />
+                    <span>⏰ 24時間予定表</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      setTempName(data.ownerName);
+                      setTempType(data.selfType);
+                      setIsProfileModalOpen(true);
+                    }}
+                    className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-stone-100 text-stone-800 text-xs font-bold text-left cursor-pointer"
+                  >
+                    <Edit3 className="w-4 h-4 text-emerald-700" />
+                    <span>👤 飼育員プロフィール変更</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      setIsShareModalOpen(true);
+                    }}
+                    className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-stone-100 text-stone-800 text-xs font-bold text-left cursor-pointer"
+                  >
+                    <Share2 className="w-4 h-4 text-emerald-700" />
+                    <span>🔗 観察日記を共有</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Bottom Auth button in Drawer */}
+              <div className="border-t border-stone-200 pt-3">
+                {currentUser ? (
+                  <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-stone-500 font-medium">ログイン中</span>
+                      <span className="text-xs font-bold text-emerald-900 truncate max-w-[140px]">
+                        {currentUser.displayName || data.ownerName}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        handleGoogleLogout();
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="p-1.5 text-stone-400 hover:text-rose-600 transition cursor-pointer"
+                      title="ログアウト"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      handleGoogleLogin();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    <span>Googleアカウントで同期</span>
+                  </button>
+                )}
+              </div>
+
             </motion.div>
           </div>
         )}

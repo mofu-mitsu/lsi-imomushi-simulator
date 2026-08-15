@@ -650,43 +650,51 @@ export default function CaterpillarRoom({
   // Stage emoji mappings (Stage 0 - 5)
   const getStageEmoji = () => {
     if (stage === 0) return '🐛';
-    if (stage === 1) return '🐛';
-    if (stage === 2) return '🛡️'; // Steel Shelter Chrysalis (さなぎ・繭)
-    if (stage === 3) return '💎'; // Cube Crystal Chrysalis (水晶さなぎ)
-    if (stage === 4) return '💠'; // Spatial Control Chrysalis (覚醒前夜蛹)
-    if (stage >= 5) return '🦋'; // Full Butterfly
+    if (stage === 1) return '🐛'; // 規律の幼虫・課長級
+    if (stage === 2) return '🐛'; // 法務統制芋虫（Ti-Se監査型）
+    if (stage === 3) return '🐛'; // 直角幾何学エリート芋虫
+    if (stage === 4) return '🛡️'; // 立方体クリスタルさなぎ（完全防壁シェルター・Stage4のみ蛹）
+    if (stage >= 5) return '🦋'; // 構造化アゲハ完全体（領域展開・絶対秩序蝶）
     return '🐛';
   };
 
-  // Darling Guess Mood Handler
+  // Darling Guess Mood Handler (Supports decimal accuracy!)
   const handleDarlingGuessSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const val = parseInt(guessInput, 10);
+    const val = parseFloat(guessInput);
     if (isNaN(val) || val < 1 || val > 100) return;
 
     setDarlingAttempts(a => a + 1);
 
-    if (val === darlingMoodTarget) {
-      setDarlingHint('🎯 ピタリ正解！ 「しゃーないな、ダーリン♡ ちゃんと分かってくれたけん芋虫ちゃん返したるわ♡」');
+    const diff = Math.abs(val - darlingMoodTarget);
+
+    if (diff < 0.05) {
+      setDarlingHint(`🎯 ピタリ正解！（機嫌: ${darlingMoodTarget}） 「しゃーないな、ダーリン♡ ちゃんとウチの機嫌分かってくれたけん芋虫ちゃん返したるわ♡」`);
       setTimeout(() => {
         if (onResolveDarlingIncident) onResolveDarlingIncident(true);
       }, 2500);
     } else if (val < darlingMoodTarget) {
-      setDarlingHint(`「ウチの機嫌、そんな低ないわ♡ もっと上やで？（${val}より高い）」`);
+      if (diff >= 5) {
+        setDarlingHint(`「ウチの機嫌、そんな低ないわ♡ もっともっと上やで？（${val}より5以上高い）」`);
+      } else if (diff >= 1) {
+        setDarlingHint(`「ん〜惜しいけどまだ低いで！ もうちょい上や！（${val}より1〜5高い）」`);
+      } else {
+        setDarlingHint(`「ぐぬぬ……！ 激惜しいやんけ！ あとコンマ数％上やで！？（${val}より0.1〜1高い）」`);
+      }
     } else {
-      setDarlingHint(`「ウチの機嫌、そこまで高ぶってへんわ♡ もっと下やで？（${val}より低い）」`);
+      if (diff >= 5) {
+        setDarlingHint(`「ウチの機嫌、そこまで高ぶってへんわ♡ もっともっと下やで？（${val}より5以上低い）」`);
+      } else if (diff >= 1) {
+        setDarlingHint(`「ちょっと買い被りすぎや！ もうちょい下やで！（${val}より1〜5低い）」`);
+      } else {
+        setDarlingHint(`「ぐぬぬ……！ 激惜しいやんけ！ あとコンマ数％下やで！？（${val}より0.1〜1低い）」`);
+      }
     }
   };
 
-  // Use spray to dispel Darling-chan during incident
+  // Spray is useless against Darling-chan incident (Preserves Daycare value)
   const handleSprayDispelDarling = () => {
-    if (sprayCount > 0 && onUseSpray) {
-      onUseSpray();
-      setDarlingHint('💨 シュッ！！ 「きゃっ！？ なんなんそのスプレー！ 臭いわー！ 帰るわ！」');
-      setTimeout(() => {
-        if (onResolveDarlingIncident) onResolveDarlingIncident(true);
-      }, 2000);
-    }
+    setDarlingHint('💨 スプレー噴射！……しかしダーリンちゃんには全く効かない！「そんな安物スプレー効くわけないやん♡ 保育園に預けとかんからやで？w」');
   };
 
   return (
@@ -927,11 +935,12 @@ export default function CaterpillarRoom({
 
             {/* Caterpillar Body */}
             <motion.div 
-              className="inline-block transition-transform select-none"
+              className="inline-block transition-transform select-none origin-bottom"
               style={{ 
                 transform: isSquashed 
-                  ? 'scaleY(0.04) scaleX(2.8) skewX(25deg)' 
-                  : `scaleX(${facingRight ? -1 : 1})`
+                  ? 'scaleY(0.05) scaleX(2.7) rotate(6deg) skewX(22deg)' 
+                  : `scaleX(${facingRight ? -1 : 1})`,
+                filter: isSquashed ? 'brightness(0.85) saturate(1.3) drop-shadow(0 2px 2px rgba(0,0,0,0.5))' : undefined
               }}
               animate={!isSquashed && !isSleepingNow ? { 
                 rotate: catTarget || foods.length > 0 ? [-3, 3, -3] : 0,
@@ -960,7 +969,7 @@ export default function CaterpillarRoom({
             DARLING-CHAN NEGLECT INCIDENT OVERLAY (3-DAY INACTIVITY)
         ------------------------------------------------------------- */}
         {isDarlingIncident && (
-          <div className="absolute inset-0 z-50 bg-indigo-950/90 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center">
+          <div className="absolute inset-0 z-50 bg-indigo-950/95 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center">
             
             <div className="bg-red-600 text-white text-xs font-black px-3 py-1 rounded-full animate-bounce shadow-md flex items-center gap-1.5 mb-2">
               <AlertTriangle className="w-4 h-4" />
@@ -985,10 +994,10 @@ export default function CaterpillarRoom({
             <div className="bg-stone-900 border-2 border-indigo-400 rounded-2xl p-3.5 max-w-sm w-full my-2 text-left shadow-xl">
               <p className="text-xs sm:text-sm text-pink-300 font-bold leading-relaxed mb-2">
                 「ダーリン♡ 芋虫ちゃん？ ウチが踏みつぶしてどっか行っちゃったで？w<br/>
-                1〜100でウチの機嫌当ててくれたら、許して返したるわ🥺♡」
+                1〜100（小数可）でウチの機嫌当ててくれたら、許して返したるわ🥺♡」
               </p>
               {darlingHint && (
-                <div className="bg-indigo-900/80 border border-indigo-400 text-indigo-100 text-xs font-bold p-2 rounded-xl text-center animate-pulse">
+                <div className="bg-indigo-900/90 border border-indigo-400 text-indigo-100 text-xs font-bold p-2 rounded-xl text-center animate-pulse">
                   {darlingHint}
                 </div>
               )}
@@ -998,12 +1007,13 @@ export default function CaterpillarRoom({
             <form onSubmit={handleDarlingGuessSubmit} className="flex gap-2 max-w-xs w-full justify-center">
               <input
                 type="number"
+                step="0.1"
                 min={1}
                 max={100}
                 value={guessInput}
                 onChange={(e) => setGuessInput(e.target.value)}
-                placeholder="1〜100"
-                className="w-24 bg-white border-2 border-indigo-400 rounded-xl px-3 py-2 text-center text-base font-black text-stone-900 focus:outline-none focus:ring-2 focus:ring-rose-400"
+                placeholder="例: 42.5"
+                className="w-28 bg-white border-2 border-indigo-400 rounded-xl px-3 py-2 text-center text-base font-black text-stone-900 focus:outline-none focus:ring-2 focus:ring-rose-400"
               />
               <button
                 type="submit"
@@ -1013,19 +1023,21 @@ export default function CaterpillarRoom({
               </button>
             </form>
 
-            {/* Spray Quick Repel Option if owned */}
+            {/* Spray Repel Test - Displays useless message to preserve Daycare */}
             {sprayCount > 0 && (
               <button
+                type="button"
                 onClick={handleSprayDispelDarling}
-                className="mt-2.5 bg-sky-500 hover:bg-sky-600 text-white font-black text-xs px-4 py-2 rounded-xl shadow-md border border-white flex items-center gap-1.5 transition active:scale-95 cursor-pointer animate-pulse"
+                className="mt-2.5 bg-stone-700 hover:bg-stone-600 text-stone-200 font-black text-xs px-4 py-2 rounded-xl shadow-md border border-stone-500 flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
               >
                 <Wind className="w-4 h-4" />
-                <span>💨 スプレー噴射で即撃退！（残り: {sprayCount}回）</span>
+                <span>💨 スプレーを噴射してみる（※ダーリンちゃんには無効）</span>
               </button>
             )}
 
             {/* Give up option */}
             <button
+              type="button"
               onClick={() => {
                 if (onResolveDarlingIncident) onResolveDarlingIncident(false);
               }}
