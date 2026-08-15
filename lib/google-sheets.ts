@@ -129,7 +129,14 @@ export async function syncWithGas(
           discoveredStages: data.discoveredStages || ['LSI芋虫（幼虫）'],
           lastFedAt: data.lastFedAt,
           lastMessageAt: data.lastMessageAt,
-          uid: data.uid || ''
+          uid: data.uid || '',
+          sprayCount: data.sprayCount || 0,
+          daycareUntil: data.daycareUntil || null,
+          darlingIncident: data.darlingIncident || false,
+          darlingMoodTarget: data.darlingMoodTarget || 50,
+          foodStats: data.foodStats || { cabbage: 0, apple: 0, glucose: 0, sugar: 0, twig: 0 },
+          formVariant: data.formVariant || 'crystal',
+          squashCount: data.squashCount || 0
         }
       })
     });

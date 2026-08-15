@@ -30,7 +30,9 @@ import {
   ShieldAlert,
   AlertTriangle,
   Menu,
-  Calendar
+  Calendar,
+  Save,
+  RefreshCw
 } from 'lucide-react';
 import CaterpillarRoom, { AVAILABLE_FURNITURE, DAILY_SCHEDULE, getCurrentSchedule, FurnitureItem, isSleepingTime } from './CaterpillarRoom';
 import MiniGames from './MiniGames';
@@ -370,6 +372,8 @@ export default function Dashboard() {
   const [tempType, setTempType] = useState('');
   const [copiedShare, setCopiedShare] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+  const [saveToast, setSaveToast] = useState<string | null>(null);
 
   // Chat state
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'lsi'; text: string; provider?: string }[]>([
@@ -510,6 +514,8 @@ export default function Dashboard() {
     setSyncStatus('syncing');
     try {
       const res = await syncWithGas(DEFAULT_GAS_URL, currentData);
+      const nowStr = new Date().toLocaleTimeString();
+      setLastSavedTime(nowStr);
       if (res.success) {
         setSyncStatus('synced');
         setTimeout(() => setSyncStatus('idle'), 3000);
@@ -520,6 +526,48 @@ export default function Dashboard() {
       setSyncStatus('error');
     }
   }, []);
+
+  // Manual Save (Immediate Local + Cloud Persistence)
+  const handleManualSave = useCallback(async () => {
+    if (syncStatus === 'syncing') return;
+    setSyncStatus('syncing');
+    const nowStr = new Date().toLocaleTimeString();
+
+    // 1. Force LocalStorage save
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+      console.error('Manual local save error:', e);
+    }
+
+    // 2. Cloud Sync to GAS / Spreadsheet
+    try {
+      const res = await syncWithGas(DEFAULT_GAS_URL, data);
+      setLastSavedTime(nowStr);
+      if (res.success) {
+        setSyncStatus('synced');
+        setSaveToast(`✅ クラウド & ブラウザに保存完了 (${nowStr})`);
+        setTimeout(() => {
+          setSyncStatus('idle');
+          setSaveToast(null);
+        }, 3500);
+      } else {
+        setSyncStatus('synced');
+        setSaveToast(`ℹ️ ローカル保存完了 (クラウド: 通信待機中)`);
+        setTimeout(() => {
+          setSyncStatus('idle');
+          setSaveToast(null);
+        }, 3500);
+      }
+    } catch {
+      setSyncStatus('error');
+      setSaveToast('⚠️ クラウド保存で通信エラー（ローカルには保存完了）');
+      setTimeout(() => {
+        setSyncStatus('idle');
+        setSaveToast(null);
+      }, 3500);
+    }
+  }, [data, syncStatus]);
 
   // Google Sign In
   const handleGoogleLogin = async () => {
@@ -625,9 +673,10 @@ export default function Dashboard() {
       };
       
       appendLogToGas(prev.gasWebAppUrl, 'FEED', logText, expGain, prev.uid);
+      triggerGasSync(updated);
       return updated;
     });
-  }, []);
+  }, [triggerGasSync]);
 
   // Squash Level Down Handler
   const handleSquashLevelDown = useCallback((expLoss: number, reason: string) => {
@@ -648,9 +697,10 @@ export default function Dashboard() {
       };
 
       appendLogToGas(prev.gasWebAppUrl, 'PENALTY', logText, -expLoss, prev.uid);
+      triggerGasSync(updated);
       return updated;
     });
-  }, []);
+  }, [triggerGasSync]);
 
   // Mini-game reward handler: High points (Coins), low EXP
   const handleMiniGameReward = useCallback((pointsGained: number, expGained: number, gameName: string) => {
@@ -681,9 +731,10 @@ export default function Dashboard() {
       };
 
       appendLogToGas(prev.gasWebAppUrl, 'GAME', logText, expGained, prev.uid);
+      triggerGasSync(updated);
       return updated;
     });
-  }, []);
+  }, [triggerGasSync]);
 
   // Shop purchase: Furniture
   const handleBuyFurniture = useCallback((item: FurnitureItem) => {
@@ -776,11 +827,15 @@ export default function Dashboard() {
 
   // Use spray handler
   const handleUseSpray = useCallback(() => {
-    setData(prev => ({
-      ...prev,
-      sprayCount: Math.max(0, (prev.sprayCount || 1) - 1)
-    }));
-  }, []);
+    setData(prev => {
+      const updated = {
+        ...prev,
+        sprayCount: Math.max(0, (prev.sprayCount || 1) - 1)
+      };
+      triggerGasSync(updated);
+      return updated;
+    });
+  }, [triggerGasSync]);
 
   // Resolve Darling-chan incident handler
   const handleResolveDarlingIncident = useCallback((success: boolean) => {
@@ -976,6 +1031,44 @@ export default function Dashboard() {
               <Edit3 className="w-4 h-4" />
             </button>
 
+            {/* Manual Save Button */}
+            <button
+              onClick={handleManualSave}
+              disabled={syncStatus === 'syncing'}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer active:scale-95 border ${
+                syncStatus === 'syncing'
+                  ? 'bg-amber-50 border-amber-300 text-amber-900 cursor-wait'
+                  : syncStatus === 'synced'
+                  ? 'bg-emerald-100 border-emerald-400 text-emerald-900'
+                  : syncStatus === 'error'
+                  ? 'bg-rose-50 border-rose-300 text-rose-800'
+                  : 'bg-white hover:bg-stone-50 border-stone-300 text-stone-800'
+              }`}
+              title={lastSavedTime ? `最終保存: ${lastSavedTime}` : 'Googleスプレッドシート & ブラウザに手動保存'}
+            >
+              {syncStatus === 'syncing' ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                  <span>保存中...</span>
+                </>
+              ) : syncStatus === 'synced' ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>保存完了</span>
+                </>
+              ) : syncStatus === 'error' ? (
+                <>
+                  <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                  <span>保存再試行</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>セーブ</span>
+                </>
+              )}
+            </button>
+
             {/* Google Account Button */}
             {currentUser ? (
               <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 pl-2.5 pr-1.5 py-1 rounded-xl">
@@ -1012,8 +1105,28 @@ export default function Dashboard() {
 
           </div>
 
-          {/* Mobile Hamburger Menu Button */}
+          {/* Mobile Hamburger & Quick Save Buttons */}
           <div className="flex md:hidden items-center gap-1.5">
+            <button
+              onClick={handleManualSave}
+              disabled={syncStatus === 'syncing'}
+              className={`p-2 rounded-xl border text-xs font-bold transition shadow-xs cursor-pointer active:scale-95 ${
+                syncStatus === 'syncing'
+                  ? 'bg-amber-50 border-amber-300 text-amber-900'
+                  : syncStatus === 'synced'
+                  ? 'bg-emerald-100 border-emerald-400 text-emerald-900'
+                  : 'bg-white border-stone-200 text-stone-800 hover:bg-stone-100'
+              }`}
+              title="データを保存"
+            >
+              {syncStatus === 'syncing' ? (
+                <RefreshCw className="w-4 h-4 animate-spin text-amber-600" />
+              ) : syncStatus === 'synced' ? (
+                <Check className="w-4 h-4 text-emerald-700" />
+              ) : (
+                <Save className="w-4 h-4 text-emerald-700" />
+              )}
+            </button>
             <button
               onClick={() => setIsMobileMenuOpen(true)}
               className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-800 transition cursor-pointer"
@@ -1163,6 +1276,38 @@ export default function Dashboard() {
                   </button>
                 </div>
 
+              </div>
+
+              {/* Data Persistence & Manual Save Widget */}
+              <div className="bg-white border-2 border-stone-300 rounded-2xl p-3.5 shadow-xs flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${syncStatus === 'syncing' ? 'bg-amber-500 animate-ping' : syncStatus === 'synced' ? 'bg-emerald-500' : 'bg-emerald-400'}`} />
+                  <div className="flex flex-col">
+                    <span className="text-xs font-black text-stone-800 flex items-center gap-1">
+                      <span>データ同期状態</span>
+                    </span>
+                    <span className="text-[10px] text-stone-500 font-mono">
+                      {lastSavedTime ? `最終保存: ${lastSavedTime}` : '自動保存・待機中'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={handleManualSave}
+                  disabled={syncStatus === 'syncing'}
+                  className="bg-emerald-700 hover:bg-emerald-600 active:scale-95 disabled:bg-stone-300 text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                >
+                  {syncStatus === 'syncing' ? (
+                    <>
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      <span>保存中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-3 h-3" />
+                      <span>今すぐセーブ</span>
+                    </>
+                  )}
+                </button>
               </div>
 
               {/* Activity Log */}
@@ -1776,11 +1921,13 @@ export default function Dashboard() {
                 </button>
                 <button
                   onClick={() => {
-                    setData(prev => ({
-                      ...prev,
+                    const updated = {
+                      ...data,
                       ownerName: tempName.trim() || '飼育員',
                       selfType: tempType.trim() || '未設定'
-                    }));
+                    };
+                    setData(updated);
+                    triggerGasSync(updated);
                     setIsProfileModalOpen(false);
                   }}
                   className="flex-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2 rounded-xl text-xs cursor-pointer shadow-xs"
@@ -1901,6 +2048,22 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      handleManualSave();
+                    }}
+                    className="flex items-center gap-3 p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 text-xs font-bold text-left cursor-pointer transition"
+                  >
+                    <Save className="w-4 h-4 text-emerald-700" />
+                    <div className="flex flex-col">
+                      <span>💾 今すぐセーブ（手動保存）</span>
+                      <span className="text-[10px] text-stone-500 font-normal">
+                        {lastSavedTime ? `最終: ${lastSavedTime}` : 'Googleスプレッドシート & ブラウザに保存'}
+                      </span>
+                    </div>
+                  </button>
+
                   <button
                     onClick={() => {
                       setIsMobileMenuOpen(false);
@@ -2087,6 +2250,22 @@ export default function Dashboard() {
               </button>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* -------------------------------------------------------------
+          FLOATING SAVE TOAST NOTIFICATION
+      ------------------------------------------------------------- */}
+      <AnimatePresence>
+        {saveToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-stone-900/95 backdrop-blur-sm text-white text-xs font-bold px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2 border border-stone-700 pointer-events-none"
+          >
+            <span>{saveToast}</span>
+          </motion.div>
         )}
       </AnimatePresence>
 
