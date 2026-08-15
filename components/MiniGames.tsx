@@ -1068,7 +1068,7 @@ function WhackACaterpillarGame({ onFinish }: { onFinish: (score: number) => void
 
       {/* Mission Banner */}
       <div className="bg-amber-50 border border-amber-300 text-amber-900 px-3 py-2 rounded-xl text-center font-black text-xs shadow-xs">
-        🔨 穴から出た【LSI芋虫 🐛】を連打で叩け！ 【ダーリンちゃん 🥺】を叩くと阿波弁で大減点トラップ！
+        🔨 穴から出た【LSI芋虫 🐛】を連打で叩け！ 【ダーリンちゃん 🥺】を叩くと大減点トラップ！
       </div>
 
       {/* 3x3 Whack Grid */}

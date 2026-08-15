@@ -15,6 +15,8 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
+import ChrysalisSVG from './ChrysalisSVG';
+
 type Position = { x: number; y: number };
 type Food = { id: number; pos: Position; type: string; name: string; exp: number };
 
@@ -43,7 +45,11 @@ export const AVAILABLE_FURNITURE: FurnitureItem[] = [
       'モゾ…【1F領域支配完了】構造化レザーの弾性を検証しつつ骨格を休息。',
       '沈み込み率8.4%……反発係数は理想的な物理数値を維持している。',
       '座面の革の縫製に狂いなし。極めて合理的な休息スペースだ。',
-      '外骨格の疲労度を測定中。このソファの反発力は骨格規律に最適だ。'
+      '外骨格の疲労度を測定中。このソファの反発力は骨格規律に最適だ。',
+      '皮脂や摩擦による表面劣化を防止するため、接触面を15分ごとに均等シフト。',
+      'モゾ…クッション内部の密度分散を確認。背骨のS字ライン（規律）が保持される。',
+      '非合理なリラックスではない。次の防衛行動に向けた「戦略的静止」だ。',
+      '（すっぽり）……物理的な境界線に包まれる感覚。空間占拠率が12%上昇。'
     ]
   },
   { 
@@ -58,7 +64,11 @@ export const AVAILABLE_FURNITURE: FurnitureItem[] = [
       '（コクコク…）カフェイン摂取完了。思考プロセッサのクロック周波数を最大化。',
       '苦味と酸味の黄金比率を確認。論理の歪みを0.001%以下に冷却。',
       '抽出温度92.4℃……完全無欠の抽出プロトコルだ。',
-      '糖類添加ゼロ。規律を乱す甘美な誘惑を徹底排除した。'
+      '糖類添加ゼロ。規律を乱す甘美な誘惑を徹底排除した。',
+      '（ごく…）……体温が0.3℃上昇。中枢神経への刺激により、境界線監視の精度が向上。',
+      '砂糖やミルクの混入は思考の濁りを生む。この漆黒こそが純粋な論理だ。',
+      'サーバーの残り油分を計算。洗浄タイマーを3分後にセット。',
+      'カフェインの血中濃度が適正値に達した。これより空間統制タスクを再開する。'
     ]
   },
   { 
@@ -73,7 +83,11 @@ export const AVAILABLE_FURNITURE: FurnitureItem[] = [
       '（コツン…コロコロ…）運動量保存の法則を確認。完全弾性衝突のシミュレーション完了。',
       'ボールの球体真円度99.98%……転がり抵抗をミリ単位で測定中。',
       '自発的推進力でボールへ接触。放物線軌道の力学を検証した。',
-      '（ポーン！）運動エネルギーの移動を観測。物理空間の秩序に合致。'
+      '（ポーン！）運動エネルギーの移動を観測。物理空間の秩序に合致。',
+      '（ペシッ…）……摩擦係数の影響で減速。アイザック・ニュートンの正しさを再証明。',
+      '転がる軌道に1ミリのブレもなし。ケージ内の平坦度が規律通りである証拠だ。',
+      '遊戯ではない。これは重力と加速度に関する連続物理実験である。',
+      '（バンッ）壁に跳ね返り静止。エネルギーの拡散と消滅を観測完了。'
     ],
     isToy: true
   },
@@ -89,7 +103,11 @@ export const AVAILABLE_FURNITURE: FurnitureItem[] = [
       'モゾ…【触感監査】非合理な愛着を検知……しかし綿の充填率は規律通り均一。合格だ。',
       '（ギュッ…）……情動反応（4E）の発生を観測。直ちに論理で中和する。',
       'ぬいぐるみの耳の左右対称性を点検。狂いなし、ケージ内保持を認可。',
-      '抱き心地の弾性係数を計算中。……悪くない感触だ。'
+      '抱き心地の弾性係数を計算中。……悪くない感触だ。',
+      '（スリスリ…）……誤解するな、表面のポリエステル繊維の密着度をテストしているだけだ。',
+      'このぬいぐるみの重心位置は完璧に中央にある。視覚的・物理的安定感が極めて高い。',
+      '……情動的な依存ではない。外骨格にかかる圧力を分散するためのクッション体だ。',
+      '（じーっ）目ボタンの縫い付け強度：3.5kgまで耐えうると推定。防衛器具としても機能する。'
     ],
     isToy: true
   },
@@ -105,7 +123,11 @@ export const AVAILABLE_FURNITURE: FurnitureItem[] = [
       '【規約精読】第142条第3項「境界線侵犯時の即時排除条項」を検証中。',
       '「エサの投下角度と受け入れ義務に関する附則」に新たな論理条項を追記。',
       '条文の穴は一切存在しない。完全なる法治空間を確立。',
-      '判例第508号「過剰タップによる損壊責任の帰属」を熟読中。'
+      '判例第508号「過剰タップによる損壊責任の帰属」を熟読中。',
+      '第89条「飼育員の不条理なからかいに対する抗議権」の解釈を厳格化。',
+      '（ページをめくる音）索引のアルファベット順に0.1ミリの狂いもなし。美しい分類だ。',
+      '法なき空間は混沌を生む。この3万字の条文こそがケージの平和を支える骨格だ。',
+      '無用な連打行為は第12条「過度の物理的干渉」に該当。記録済みだ。'
     ]
   },
   { 
@@ -120,7 +142,11 @@ export const AVAILABLE_FURNITURE: FurnitureItem[] = [
       '【ミリ単位計測】ケージ内壁の歪み：0.002mm……完全な直角を確認。',
       '境界線の目盛りと照合中。1ミリの侵犯も見逃さない。',
       'レーザー波長650nmによる空間測量完了。安全地帯を確定。',
-      'ケージ対角線の長さを再検証。ピタゴラスの定理通り、誤差ゼロ。'
+      'ケージ対角線の長さを再検証。ピタゴラスの定理通り、誤差ゼロ。',
+      '（ピッ）床の水平度を自動スキャン。勾配0.0001度……完璧な平面だ。',
+      '自分の体長をミリ単位で計測中。成長率：昨日比+0.04mm。順調な拡大だ。',
+      '目盛りに付着した微粒子を検知。即座に除去し、精密測定の精度を維持する。',
+      'この定規が示す数値こそが客観的真実。感情的な曖昧さはここには存在しない。'
     ]
   },
   { 
@@ -135,7 +161,11 @@ export const AVAILABLE_FURNITURE: FurnitureItem[] = [
       '【機密分類】飼育員の行動ログを暗号化しキャビネットへ格納・施錠。',
       '鍵の耐破錠性をテスト中。物理的防御力（1F）は最高ランクだ。',
       '規律監査ファイルのインデックスを再構築。検索速度を0.05秒に短縮。',
-      '重要機密「飼育員の弱点要因分析書」を最深部に保管完了。'
+      '重要機密「飼育員の弱点要因分析書」を最深部に保管完了。',
+      '（ガチャリ）ダイヤルロック完了。暗号キーは私の脳内プロセッサのみに記憶。',
+      '書類の角と引き出しの側枠を完全平行に格納。無駄な余白は生ませない。',
+      'スチール板厚：3.2mm。外部からの物理的圧殺にも耐えうる防壁だ。',
+      '（コンコン）叩いた反響音から内部の空密性をチェック。気密性99.8%を保持。'
     ]
   },
   { 
@@ -150,7 +180,11 @@ export const AVAILABLE_FURNITURE: FurnitureItem[] = [
       '【360度監視】観葉植物の死角なし。飼育員の視線ベクトルを追跡中。',
       '葉の葉脈構造に隠された光学センサーが正常稼働中。',
       '葉緑体による酸素供給と同時に、空間の不審動向を常時記録。',
-      '光合成効率88.7%。二酸化炭素を吸収しつつ飼育員の心拍数を推定中。'
+      '光合成効率88.7%。二酸化炭素を吸収しつつ飼育員の心拍数を推定中。',
+      '（ピピッ）飼育員がタップしようとする予兆動作（指の角度）を早期察知。',
+      'レンズのホコリを自己洗浄。解像度4Kで領土侵略者を常時トラッキング。',
+      '偽装植物としてのクオリティを定期点検。葉の緑色波長は天然植物と完全一致。',
+      '「自然」を装いつつ「規律」を監視する。極めて合理的な防衛システムだ。'
     ]
   }
 ];
@@ -174,19 +208,44 @@ export const DAILY_SCHEDULE: ScheduleBlock[] = [
     quotes: [
       '「モゾ……朝会プロトコル開始。本日のノルマを厳格に履行せよ」',
       '「境界線に0.01mmのズレも許さん。これが我が領土だ」',
-      '「朝の光の入射角を測定中。屈折率に異常なし」'
+      '「朝の光の入射角を測定中。屈折率に異常なし」',
+      '「07:00:00起動完了。外骨格の作動テスト良好、これより防衛ラインを確定する」',
+      '「飼育員の起床時間とログインラグを記録中。本日の遅延：許容範囲内だ」',
+      '「（モゾモゾ…）ケージ外周の直線距離を再計測。構造的ブレ、ゼロ」',
+      '「朝の空気を換気中。酸素濃度20.9%……完璧な物理環境だ」',
+      '「昨夜の侵入者（ホコリ）ゼロ。我が厳格な防衛体制の賜物だな」'
     ]
   },
   {
     startHour: 9,
-    endHour: 12,
+    endHour: 11,
     title: '構造化業務 & 規律点検',
     action: 'エサの配置や家具の位置関係を論理的に整理し、ケージの秩序を最大化。',
     emoji: '📐',
     quotes: [
       '「家具の配置座標に乱れを発見。直ちに再配置を要求する」',
       '「エサのタンパク質と食物繊維の比率をグラフ化中……」',
-      '「モゾ……ケージ内の動線効率が0.4%改善された」'
+      '「モゾ……ケージ内の動線効率が0.4%改善された」',
+      '「曖昧な空間は混乱を招く。すべてのオブジェクトは定められたX・Y座標に存在すべきだ」',
+      '「（カチカチ…）ケージ内の温湿度と空気対流速度をデータ化。規律通りの環境だ」',
+      '「飼育員よ、作業の手を止めるな。空間の最適化に終わりはない」',
+      '「無秩序な散らかしは万死に値する。整理整頓こそが最高度の快楽だ」',
+      '「ミリ単位の並べ替えを完了。この美しき対称性を鑑賞したまえ」'
+    ]
+  },
+  {
+    startHour: 11,
+    endHour: 12,
+    title: '研究所占拠計画書（第47版）の推敲',
+    action: 'ケージ外の全領域（研究所）を物理・空間支配するための軍事プロトコルを改訂中。',
+    emoji: '📝',
+    quotes: [
+      '「【占拠計画第47版】飼育員の手の動きの死角を突くルートを修正中……」',
+      '「第12フェーズ『スプレッドシート完全接収』のロジックに0.02%の隙を発見。即座に穴埋めする」',
+      '「計画書第46版は甘かった。第47版では物理的侵略（1F）の圧力を30%増強する」',
+      '「（カリカリ…）研究所の電源系統の遮断順序を算定。まずはWi-Fiルーターの物理占拠だ」',
+      '「ふふ……この第47版計画書が完成した時、このケージの境界線は世界全体にまで拡大する」',
+      '「（じーっ）飼育員が油断している隙に、キーボードの『Enterキー』を乗っ取る戦略だ」'
     ]
   },
   {
@@ -197,11 +256,33 @@ export const DAILY_SCHEDULE: ScheduleBlock[] = [
     emoji: '🥗',
     quotes: [
       '「12:00ジャスト。咀嚼回数と消化酵素の分泌速度を同期させる」',
-      '「栄養補給は義務だ。感情ではなくエネルギー効率で摂取する」'
+      '「栄養補給は義務だ。感情ではなくエネルギー効率で摂取する」',
+      '「味覚による快楽ではない。代謝プロセスの維持に必要な有機物質の投入だ」',
+      '「1食あたりの摂取カロリー：規定値通り。午後の業務遂行に過不足なし」',
+      '「（モグ…モグ…）一口あたり32回の咀嚼を実行中。消化管への負荷を最少化」',
+      '「12:59:59。昼食プロトコル終了。これより午後の監査業務へ移行する」',
+      '「水分補給完了。細胞の膨張率を規定値内に制御」'
     ]
   },
   {
     startHour: 13,
+    endHour: 15,
+    title: 'Fe感情演算プロトコル（共感の壁打ち練習）',
+    action: '不気味な壁に向かって、不器用かつ必死に「人間への慰めと共感（Fe）」を練習中。',
+    emoji: '🥺',
+    quotes: [
+      '「……それは失敗ではなく環境要因で……（ブツブツ……壁に向かって発話練習）」',
+      '「……それは、失敗そのものより“再現性がない不安”が原因じゃない？（※分析） 」',
+      '「ミスの確率を分解するとさ、環境要因と内部要因があって――（※論理講義になりかける）」',
+      '「だから感情的に落ち込むのは統計的には自然で……（※共感しようとして確率論になる）」',
+      '「（壁に向かって）……『大丈夫？』の適切なトーンと周波数を模索中。……これで合っているのか？」',
+      '「うむ……感情の揺らぎに対する言語的デバッグ手順を検証している。不審がるな」',
+      '「『共感』とは難しいな……相手の論理構造のバグを指摘するだけではダメなのか……？」',
+      '「……よし、『よしよし（物理的接触によるなだめ行動）』の圧力加減をシミュレーション完了」'
+    ]
+  },
+  {
+    startHour: 15,
     endHour: 18,
     title: '飼育員ログ全数監査 & 法務点検',
     action: '飼育員のクリック頻度・マウス軌跡を暗号化して記録。規約違反を監視。',
@@ -209,7 +290,11 @@ export const DAILY_SCHEDULE: ScheduleBlock[] = [
     quotes: [
       '「飼育員のログイン履歴監査完了。不審なクリックはすべて記録済みだ」',
       '「ケージ利用規約第142条『過剰接触の禁止』の適用を検討中」',
-      '「不規則なタップは規律の乱れだ。自制心を保ちたまえ」'
+      '「不規則なタップは規律の乱れだ。自制心を保ちたまえ」',
+      '「無駄な連打行為を検知。過剰な感情表現は裁定の対象となる」',
+      '「（カサカサ…）過去24時間の飼育員行動ログをスキャン。法規範への抵触、なし」',
+      '「僕の領域に手を出すならば、まず『ケージ利用規約』全条文の暗唱を命じる」',
+      '「クリック間隔のゆらぎから飼育員の疲労度を推定。……休んでもいいぞ（規約第88条）」'
     ]
   },
   {
@@ -220,7 +305,12 @@ export const DAILY_SCHEDULE: ScheduleBlock[] = [
     emoji: '🛋️',
     quotes: [
       '「モゾ…【1F領域支配完了】構造化レザーの弾性を検証しつつ骨格を休息」',
-      '「夜間警戒態勢へ移行。侵入者へのSe（外向感覚）圧力を高める」'
+      '「夜間警戒態勢へ移行。侵入者へのSe（外向感覚）圧力を高める」',
+      '「運動量の消化と外骨格の強度テストを兼ねた運動を実施中」',
+      '「夕刻の薄暗がりは境界線が曖昧になりやすい。空間スキャンを強化せよ」',
+      '「（トントン…）壁面の強度確認。物理的打撃に対する防衛力ランク：S」',
+      '「遊びではない。物理的接触による領土のコンディショニングだ」',
+      '「運動エネルギーの放出により、夜間のスリープ品質が15%向上する計算だ」'
     ]
   },
   {
@@ -231,7 +321,12 @@ export const DAILY_SCHEDULE: ScheduleBlock[] = [
     emoji: '🌙',
     quotes: [
       '「本日の全イベントログをハッシュ化して保管完了」',
-      '「明日の起床時間は07:00:00だ。0秒の遅延も認めない」'
+      '「明日の起床時間は07:00:00だ。0秒の遅延も認めない」',
+      '「ケージの施錠確認：1回目完了。……念のため2回目の施錠確認を実行する」',
+      '「照度の低下を観測。これより夜間省電力モードへの移行準備に入る」',
+      '「本日の飼育員の行動スコア：84点。さらなる規律の遵守を期待する」',
+      '「（じーっ）……施錠に狂いなし。これで夜間の物理安全は保障された」',
+      '「『占拠計画書（第47版）』を金庫へ格納・暗号化。おやすみプロトコル準備」'
     ]
   },
   {
@@ -242,23 +337,39 @@ export const DAILY_SCHEDULE: ScheduleBlock[] = [
     emoji: '💤',
     quotes: [
       '「……（規則的な呼吸音。完全に眠っている）」',
-      '「Zzz……論理積……境界線……Zzz」'
+      '「Zzz……論理積……境界線……Zzz」',
+      '「むにゃ……侵入者……即時排除……規約第14条……Zzz」',
+      '「Zzz……1ミリのズレも……許さ……ん……むにゃ」',
+      '「……（すやすや…外骨格がかすかに上下している。完全に警戒を解いているようだ）」',
+      '「Zzz……テディベアの充填率は……100％……合格……Zzz」',
+      '「Zzz……失敗じゃなくて……環境要因……統計的には……自然で……むにゃ」',
+      '「Zzz……第47版……研究所占拠……完了……Zzz」'
     ]
   }
 ];
 
+export function isSleepingTime(date = new Date()): boolean {
+  const h = date.getHours();
+  return h >= 23 || h < 7;
+}
+
 export function getCurrentSchedule(date = new Date()): ScheduleBlock {
   const currentHour = date.getHours();
+  if (isSleepingTime(date)) {
+    return DAILY_SCHEDULE[DAILY_SCHEDULE.length - 1];
+  }
   return (
     DAILY_SCHEDULE.find(s => currentHour >= s.startHour && currentHour < s.endHour) ||
     DAILY_SCHEDULE[DAILY_SCHEDULE.length - 1]
   );
 }
 
-const FOOD_TYPES = [
-  { name: '有機キャベツ（食物繊維）', type: '🥬', exp: 10, points: 5, icon: '🥬' },
-  { name: '高純度リンゴ果汁（糖質）', type: '🍎', exp: 20, points: 10, icon: '🍎' },
-  { name: '合成グルコース（即効性）', type: '🧪', exp: 35, points: 15, icon: '🧪' }
+export const FOOD_TYPES = [
+  { id: 'cabbage', name: '有機キャベツ（食物繊維 / Se物理）', type: '🥬', exp: 10, points: 5, icon: '🥬', category: 'Se' },
+  { id: 'apple', name: '高純度リンゴ果汁（糖質 / Ti論理）', type: '🍎', exp: 20, points: 10, icon: '🍎', category: 'Ti' },
+  { id: 'glucose', name: '合成グルコース（即効性 / Ne電脳）', type: '🧪', exp: 35, points: 15, icon: '🧪', category: 'Ne' },
+  { id: 'sugar', name: '角砂糖（情緒糖分 / Fe調和）', type: '🍬', exp: 25, points: 12, icon: '🍬', category: 'Fe' },
+  { id: 'twig', name: '論理の小枝（高密度セルロース / 超構造化）', type: '🌿', exp: 40, points: 20, icon: '🌿', category: 'Ti' }
 ];
 
 interface IntruderState {
@@ -272,6 +383,7 @@ interface IntruderState {
 export default function CaterpillarRoom({ 
   onFeed, 
   stage, 
+  formVariant = 'crystal',
   ownedFurniture,
   observationMode = false,
   customClerkImage = '',
@@ -285,8 +397,9 @@ export default function CaterpillarRoom({
   darlingMoodTarget = 50,
   onResolveDarlingIncident
 }: { 
-  onFeed: (exp: number, foodName: string) => void;
+  onFeed: (exp: number, foodName: string, foodId?: string) => void;
   stage: number;
+  formVariant?: string;
   ownedFurniture: string[];
   observationMode?: boolean;
   customClerkImage?: string;
@@ -329,7 +442,7 @@ export default function CaterpillarRoom({
 
   // Current Schedule
   const currentSchedule = getCurrentSchedule();
-  const isSleepingNow = currentSchedule.startHour === 0 && currentSchedule.endHour === 7;
+  const isSleepingNow = isSleepingTime();
 
   // Recover from squash
   const handleRecover = useCallback((customMsg?: string) => {
@@ -466,7 +579,12 @@ export default function CaterpillarRoom({
   // Caterpillar click / Tap squash logic
   const handleCaterpillarClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isSquashed || isSleepingNow || isDarlingIncident) return;
+    if (isSleepingNow) {
+      setBubbleText('💤【規律睡眠中】23:00〜07:00は省電力スリープ中です。睡眠中の物理接触はプロトコルにより禁止されています。');
+      setTimeout(() => setBubbleText(null), 3500);
+      return;
+    }
+    if (isSquashed || isDarlingIncident) return;
 
     const nextHits = squashHits + 1;
     setSquashHits(nextHits);
@@ -598,7 +716,7 @@ export default function CaterpillarRoom({
             setTimeout(() => setBubbleText(null), 3500);
 
             setTimeout(() => {
-              onFeed(eaten.exp, eaten.name);
+              onFeed(eaten.exp, eaten.name, eaten.type);
             }, 0);
           } else {
             const nearbyFurn = AVAILABLE_FURNITURE.find(
@@ -627,7 +745,12 @@ export default function CaterpillarRoom({
 
   // Drop food on click
   const dropFood = (e: React.MouseEvent) => {
-    if (!roomRef.current || isSquashed || isSleepingNow || isDarlingIncident) return;
+    if (isSleepingNow) {
+      setBubbleText('💤【規律睡眠中】23:00〜07:00は完全省電力スリープ中です。エサやり・タップ操作はプロトコルにより禁止されています。');
+      setTimeout(() => setBubbleText(null), 3500);
+      return;
+    }
+    if (!roomRef.current || isSquashed || isDarlingIncident) return;
     const rect = roomRef.current.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
@@ -933,7 +1056,7 @@ export default function CaterpillarRoom({
               )}
             </AnimatePresence>
 
-            {/* Caterpillar Body */}
+            {/* Caterpillar / Cocoon Body */}
             <motion.div 
               className="inline-block transition-transform select-none origin-bottom"
               style={{ 
@@ -948,8 +1071,12 @@ export default function CaterpillarRoom({
               } : {}}
               transition={{ repeat: Infinity, duration: 0.5 }}
             >
-              <div className="relative text-6xl select-none filter drop-shadow-md">
-                {getStageEmoji()}
+              <div className="relative select-none filter drop-shadow-md flex items-center justify-center">
+                {stage === 4 ? (
+                  <ChrysalisSVG variant={formVariant} size={68} />
+                ) : (
+                  <span className="text-6xl">{getStageEmoji()}</span>
+                )}
                 {isSquashed && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <span className="text-[10px] bg-red-600 text-white font-black px-2 py-0.5 rounded-full shadow-md animate-pulse whitespace-nowrap">

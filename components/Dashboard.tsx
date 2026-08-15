@@ -32,8 +32,9 @@ import {
   Menu,
   Calendar
 } from 'lucide-react';
-import CaterpillarRoom, { AVAILABLE_FURNITURE, DAILY_SCHEDULE, getCurrentSchedule, FurnitureItem } from './CaterpillarRoom';
+import CaterpillarRoom, { AVAILABLE_FURNITURE, DAILY_SCHEDULE, getCurrentSchedule, FurnitureItem, isSleepingTime } from './CaterpillarRoom';
 import MiniGames from './MiniGames';
+import ChrysalisSVG from './ChrysalisSVG';
 import { 
   CaterpillarData, 
   DEFAULT_CATERPILLAR_DATA, 
@@ -56,9 +57,12 @@ export interface StageInfo {
   disciplineTitle: string;
   flavorQuote: string;
   hint: string;
+  category?: 'Ti' | 'Se' | 'Ne' | 'Fe' | 'Basic';
+  chrysalisVariant?: 'crystal' | 'steel' | 'cyber' | 'gold';
 }
 
-export const STAGES: StageInfo[] = [
+export const ALL_ENCYCLOPEDIA_STAGES: StageInfo[] = [
+  // Stage 0
   { 
     stageNumber: 0,
     name: 'LSI芋虫（幼虫）', 
@@ -68,66 +72,279 @@ export const STAGES: StageInfo[] = [
     visual: '🐛',
     disciplineTitle: '【初期段階】不可侵領土の確保と境界線監査',
     flavorQuote: '「ミリ単位の狂いも許さん。ここが我が不可侵領土だ」',
-    hint: '最初から解放されています。'
+    hint: '最初から解放されています。',
+    category: 'Basic'
   },
+  // Stage 1
   { 
     stageNumber: 1,
     name: '規律の幼虫・課長級', 
-    badge: 'STAGE 1', 
+    badge: 'STAGE 1 (Ti)', 
     threshold: 100, 
     desc: '毎朝の構造化目標を強制提示し、エサの消化ペースを厳格に指示する組織統制型幼虫。',
     visual: '🐛',
     disciplineTitle: '【物理統制】Se空間支配と消化ノルマ厳守',
     flavorQuote: '「モゾ……朝会プロトコル開始。本日の消化ノルマを厳格に履行せよ」',
-    hint: 'EXP 100 達成で規律が強化されます。'
+    hint: 'EXP 100達成（リンゴ・小枝多めで進化）',
+    category: 'Ti'
   },
+  { 
+    stageNumber: 1,
+    name: '警戒索敵幼虫（Se物理強化型）', 
+    badge: 'STAGE 1 (Se)', 
+    threshold: 100, 
+    desc: 'ケージ外の微細な振動を感知し、外骨格の防衛反応を高めた肉体派幼虫。',
+    visual: '🐛',
+    disciplineTitle: '【物理警戒】外向感覚（Se）による侵入即時察知',
+    flavorQuote: '「0.1ミリの地響きも感知した。外敵の気配を逃さない」',
+    hint: 'EXP 100達成（キャベツ多めで進化）',
+    category: 'Se'
+  },
+  // Stage 2
   { 
     stageNumber: 2,
     name: '法務統制芋虫（Ti-Se監査型）', 
-    badge: 'STAGE 2', 
+    badge: 'STAGE 2 (Ti)', 
     threshold: 250, 
     desc: '飼育員のクリック頻度・マウス軌跡を暗号化監査し、利用規約違反を摘発する法務特化幼虫。',
     visual: '🐛',
     disciplineTitle: '【法務統制】ケージ規約第142条の厳格運用と行動ログ暗号化',
     flavorQuote: '「飼育員の全操作ログをハッシュ化して保管中だ。規約違反は即座に摘発する」',
-    hint: 'EXP 250 達成で法務統制型幼虫へ進化します。'
+    hint: 'EXP 250達成（高純度リンゴ果汁・小枝重視）',
+    category: 'Ti'
   },
   { 
+    stageNumber: 2,
+    name: '重装甲ガーディアン芋虫（物理防壁特化型）', 
+    badge: 'STAGE 2 (Se)', 
+    threshold: 250, 
+    desc: '外殻に高密度キチン質を何層にも重ね、タップ圧力への耐性を極限まで高めた幼虫。',
+    visual: '🐛',
+    disciplineTitle: '【重装防壁】キチン質多層装甲による絶対防御態勢',
+    flavorQuote: '「いかなる物理圧力も、我が重装甲の前には無力である」',
+    hint: 'EXP 250達成（有機キャベツ重視）',
+    category: 'Se'
+  },
+  { 
+    stageNumber: 2,
+    name: '電脳分析幼虫（多次元論理型）', 
+    badge: 'STAGE 2 (Ne)', 
+    threshold: 250, 
+    desc: '合成グルコースの即効性により脳波をオーバークロックしたサイバー幼虫。',
+    visual: '🐛',
+    disciplineTitle: '【電脳解析】即効性グルコースによる思考演算周波数最大化',
+    flavorQuote: '「毎秒10万通りの空間最適化ルートをシミュレーション中だ」',
+    hint: 'EXP 250達成（合成グルコース重視）',
+    category: 'Ne'
+  },
+  { 
+    stageNumber: 2,
+    name: '情緒監査幼虫（4E中和調和型）', 
+    badge: 'STAGE 2 (Fe)', 
+    threshold: 250, 
+    desc: '角砂糖を摂取し、脆弱な感情反応（4E）を冷徹な論理で中和・飼い慣らした幼虫。',
+    visual: '🐛',
+    disciplineTitle: '【情動統御】微量糖分による劣等Feの鎮静化と調和',
+    flavorQuote: '「感情のゆらぎは観測されたが、直ちに論理係数で相殺した」',
+    hint: 'EXP 250達成（角砂糖重視）',
+    category: 'Fe'
+  },
+  // Stage 3
+  { 
     stageNumber: 3,
-    name: '直角幾何学エリート芋虫', 
-    badge: 'STAGE 3', 
+    name: '直角幾何学エリート青虫', 
+    badge: 'STAGE 3 (Ti)', 
     threshold: 450, 
     desc: '全方向の空間座標を完全な直角と直線で再定義し、外骨格の強度を極限まで高めた精鋭幼虫。',
     visual: '🐛',
     disciplineTitle: '【空間幾何】直角グリッドによる領域完全制圧と骨格強化',
     flavorQuote: '「歪みは分子レベルで排除された。完全なる直角幾何学の歩行を見よ」',
-    hint: 'EXP 450 達成で直角幾何学エリート幼虫へ進化します。'
+    hint: 'EXP 450達成（Ti論理系統）',
+    category: 'Ti'
   },
+  { 
+    stageNumber: 3,
+    name: '領域制圧エリート芋虫（Se掌握型）', 
+    badge: 'STAGE 3 (Se)', 
+    threshold: 450, 
+    desc: 'ケージ全域に不可侵の物理プレッシャーを展開し、あらゆる侵入者を威嚇する歴戦幼虫。',
+    visual: '🐛',
+    disciplineTitle: '【領域制圧】Se物理威圧による絶対防衛境界線の構築',
+    flavorQuote: '「我が足跡こそが領土の掟。一歩たりとも踏み込ませぬ」',
+    hint: 'EXP 450達成（Se物理系統）',
+    category: 'Se'
+  },
+  { 
+    stageNumber: 3,
+    name: '多次元座標掌握幼虫（電脳ネットワーク型）', 
+    badge: 'STAGE 3 (Ne)', 
+    threshold: 450, 
+    desc: 'ケージ内の3次元空間を多次元グリッドに変換し、瞬時に最適解へ移動する幼虫。',
+    visual: '🐛',
+    disciplineTitle: '【空間跳躍】多次元座標による動線無駄のゼロ化',
+    flavorQuote: '「点と点を最短で結ぶ。無駄な軌跡は存在しない」',
+    hint: 'EXP 450達成（Ne電脳系統）',
+    category: 'Ne'
+  },
+  { 
+    stageNumber: 3,
+    name: '黄金比率バランサー幼虫（完全均衡型）', 
+    badge: 'STAGE 3 (Fe)', 
+    threshold: 450, 
+    desc: 'あらゆる物理バランスと精神安定性を黄金比率（1:1.618）に調律した幼虫。',
+    visual: '🐛',
+    disciplineTitle: '【完全均衡】黄金分割比による骨格とメンタルの完全同期',
+    flavorQuote: '「完全なる美と規律は黄金比の中にのみ宿る」',
+    hint: 'EXP 450達成（Fe調和系統）',
+    category: 'Fe'
+  },
+  // Stage 4 (Chrysalis - SVG)
   { 
     stageNumber: 4,
     name: '立方体クリスタルさなぎ（完全防壁シェルター）', 
-    badge: 'STAGE 4 🛡️', 
+    badge: 'STAGE 4 💎', 
     threshold: 700, 
-    desc: '外殻を高密度合金と水晶で固めた不可侵の繭。内部で蝶への論理構造の超圧縮再構築を行う。',
-    visual: '🛡️',
+    desc: '外殻を青く輝く多面体水晶で固めた不可侵の繭。内部で蝶への論理構造の超圧縮再構築を行う。',
+    visual: '💎',
     disciplineTitle: '【要塞蛹化】不可侵シェルターによる完全防衛と内部構造化',
-    flavorQuote: '「外部のノイズは全て遮断した。我が繭は難攻不落の要塞である」',
-    hint: 'EXP 700 達成で立方体クリスタルさなぎへ変態します。'
+    flavorQuote: '「外部のノイズは全て遮断した。我が繭は難攻不落の水晶要塞である」',
+    hint: 'EXP 700達成（Ti論理結晶型・SVGさなぎ）',
+    category: 'Ti',
+    chrysalisVariant: 'crystal'
   },
   { 
+    stageNumber: 4,
+    name: '鋼鉄要塞シェルターさなぎ（不可侵装甲繭）', 
+    badge: 'STAGE 4 🛡️', 
+    threshold: 700, 
+    desc: '高密度チタン合金と六角形ハニカム装甲で固められた要塞型さなぎ。物理耐性MAX。',
+    visual: '🛡️',
+    disciplineTitle: '【鋼鉄要塞】重装甲ハニカムシールドによる絶対物理防護',
+    flavorQuote: '「核の衝撃すら弾き返す。これが我が究極の物理装甲繭だ」',
+    hint: 'EXP 700達成（Se物理装甲型・SVGさなぎ）',
+    category: 'Se',
+    chrysalisVariant: 'steel'
+  },
+  { 
+    stageNumber: 4,
+    name: '生体サイバー蛹（電脳回路繭）', 
+    badge: 'STAGE 4 ⚡', 
+    threshold: 700, 
+    desc: 'ネオンエメラルドの回路パターンが脈動するサイバネティクス繭。羽化データを高速コンパイル中。',
+    visual: '⚡',
+    disciplineTitle: '【電脳変態】超並列データ処理による完全形態コンパイル',
+    flavorQuote: '「コンパイル進行率98.7%……完全なる成虫プロトコルを展開中」',
+    hint: 'EXP 700達成（Ne電脳回路型・SVGさなぎ）',
+    category: 'Ne',
+    chrysalisVariant: 'cyber'
+  },
+  { 
+    stageNumber: 4,
+    name: '黄金幾何学蛹（黄金比率ピラミッド）', 
+    badge: 'STAGE 4 ✨', 
+    threshold: 700, 
+    desc: '神聖幾何学と黄金比率で構築された金色のピラミッド型さなぎ。神聖な規律の光を放つ。',
+    visual: '✨',
+    disciplineTitle: '【神聖幾何】黄金比ピラミッドによる完全調和変態',
+    flavorQuote: '「黄金の光の中で、混沌は完全な秩序へと昇華される」',
+    hint: 'EXP 700達成（Fe黄金調和型・SVGさなぎ）',
+    category: 'Fe',
+    chrysalisVariant: 'gold'
+  },
+  // Stage 5 (Fully Emerged Butterfly)
+  { 
     stageNumber: 5,
-    name: '構造化アゲハ完全体（領域展開・絶対秩序蝶）', 
-    badge: 'MAX STAGE 🦋', 
+    name: '構造化LSI完全体（領域展開・絶対秩序蝶）', 
+    badge: 'MAX 🦋(Ti)', 
     threshold: 1000, 
     desc: '領域展開完了。ケージの概念を超越した完全な論理と物理の統制蝶へ羽化した。',
     visual: '🦋',
     disciplineTitle: '【完全羽化】絶対的論理空間の構築と普遍的秩序展開',
     flavorQuote: '「領域展開。ケージの境界線は今や全世界へと拡張された」',
-    hint: 'EXP 1000 達成で完全体蝶へ最終羽化します！'
+    hint: 'EXP 1000達成（Ti論理の頂点）',
+    category: 'Ti'
+  },
+  { 
+    stageNumber: 5,
+    name: '鋼鉄要塞カイザーアゲハ（重力支配・絶対物理蝶）', 
+    badge: 'MAX 🦋(Se)', 
+    threshold: 1000, 
+    desc: '鋼鉄の羽ばたきで重力場を歪め、空間の全物理法則を支配する覇王蝶。',
+    visual: '🦋',
+    disciplineTitle: '【重力掌握】物理空間完全制覇とカイザーブレード羽ばたき',
+    flavorQuote: '「我が羽の軌跡が世界の重心を定める。頭を垂れよ」',
+    hint: 'EXP 1000達成（Se物理の頂点）',
+    category: 'Se'
+  },
+  { 
+    stageNumber: 5,
+    name: '電脳サイバーモルフォ（多次元空間統制蝶）', 
+    badge: 'MAX 🦋(Ne)', 
+    threshold: 1000, 
+    desc: '光ファイバーの翅を持ち、現実とデジタル空間の境界線を統御するサイバー蝶。',
+    visual: '🦋',
+    disciplineTitle: '【次元超越】デジタルとリアルの完全統合ネットワーク支配',
+    flavorQuote: '「0と1の海を舞う。あらゆるバグは私の羽ばたきで消滅する」',
+    hint: 'EXP 1000達成（Ne電脳の頂点）',
+    category: 'Ne'
+  },
+  { 
+    stageNumber: 5,
+    name: '黄金調和アゲハ（黄金比率・完全秩序蝶）', 
+    badge: 'MAX 🦋(Fe)', 
+    threshold: 1000, 
+    desc: '黄金の燐光を放ち、周囲のあらゆる不協和音と混乱を完全な美と静寂へ調和させる蝶。',
+    visual: '🦋',
+    disciplineTitle: '【黄金調和】全宇宙の不協和音を中和する絶対的安寧の展開',
+    flavorQuote: '「すべては調和された。乱れなき静寂の美をここに永遠とせよ」',
+    hint: 'EXP 1000達成（Fe調和の頂点）',
+    category: 'Fe'
   }
 ];
 
-const LOCAL_STORAGE_KEY = 'lsi_caterpillar_data_v7';
+export function getFormStageInfo(exp: number, foodStats?: CaterpillarData['foodStats']): { stageInfo: StageInfo; stageIdx: number; formVariant: string } {
+  const c = foodStats || { cabbage: 0, apple: 0, glucose: 0, sugar: 0, twig: 0 };
+  const tiScore = (c.apple || 0) * 1.5 + (c.twig || 0) * 2;
+  const seScore = (c.cabbage || 0) * 2;
+  const neScore = (c.glucose || 0) * 2.5;
+  const feScore = (c.sugar || 0) * 2.2;
+
+  let dominantCategory: 'Ti' | 'Se' | 'Ne' | 'Fe' = 'Ti';
+  const maxScore = Math.max(tiScore, seScore, neScore, feScore);
+  if (maxScore === seScore && seScore > 0) dominantCategory = 'Se';
+  else if (maxScore === neScore && neScore > 0) dominantCategory = 'Ne';
+  else if (maxScore === feScore && feScore > 0) dominantCategory = 'Fe';
+
+  let stageIdx = 0;
+  if (exp >= 1000) stageIdx = 5;
+  else if (exp >= 700) stageIdx = 4;
+  else if (exp >= 450) stageIdx = 3;
+  else if (exp >= 250) stageIdx = 2;
+  else if (exp >= 100) stageIdx = 1;
+
+  let formVariant: 'crystal' | 'steel' | 'cyber' | 'gold' = 'crystal';
+  if (dominantCategory === 'Se') formVariant = 'steel';
+  else if (dominantCategory === 'Ne') formVariant = 'cyber';
+  else if (dominantCategory === 'Fe') formVariant = 'gold';
+
+  const matches = ALL_ENCYCLOPEDIA_STAGES.filter(s => s.stageNumber === stageIdx);
+  const matched = matches.find(s => s.category === dominantCategory) || matches[0] || ALL_ENCYCLOPEDIA_STAGES[0];
+
+  return { stageInfo: matched, stageIdx, formVariant };
+}
+
+export const STAGES = ALL_ENCYCLOPEDIA_STAGES;
+
+export const CLERK_QUOTES = [
+  '「いらっしゃいませ。アイテムの購入におけるコストパフォーマンスと要因分解をお手伝いします。」',
+  '「……閲覧のみですか。空間の占有率に対して購買行動が発生しない内部要因を分析してもいいですか？」',
+  '「いらっしゃいませ。当店の商品は全てJIS規格およびLSI統制基準を満たしております。規律ある設備投資をご検討ください。」',
+  '「冷やかしですか？ 購買意思決定プロセスのボトルネックを特定しましょうか。」',
+  '「無計画な消費はエントロピーを増大させます。必要な設備のみを厳格に調達してください。」',
+  '「防虫スプレーの有効成分は高純度Ti論理結晶です。突発的な感情要求を物理的にシャットアウトします。」'
+];
+
+const LOCAL_STORAGE_KEY = 'lsi_caterpillar_data_v8';
 
 const emptySubscribe = () => () => {};
 function useIsClient() {
@@ -165,7 +382,12 @@ export default function Dashboard() {
   const [evolutionNotice, setEvolutionNotice] = useState<StageInfo | null>(null);
 
   // Shop clerk dialogue state
-  const [clerkQuote, setClerkQuote] = useState('「いらっしゃいませ。当店の商品は全てJIS規格およびLSI統制基準を満たしております。規律ある設備投資をご検討ください。」');
+  const [clerkQuote, setClerkQuote] = useState(CLERK_QUOTES[0]);
+
+  const rollClerkQuote = useCallback(() => {
+    const random = CLERK_QUOTES[Math.floor(Math.random() * CLERK_QUOTES.length)];
+    setClerkQuote(random);
+  }, []);
 
   // Safe initial local data fetcher
   const [data, setData] = useState<CaterpillarData>(() => {
@@ -175,8 +397,7 @@ export default function Dashboard() {
         if (saved) {
           const parsed = JSON.parse(saved);
           const exp = typeof parsed.exp === 'number' ? parsed.exp : 0;
-          const stageIdx = STAGES.reduce((acc, stage, idx) => exp >= stage.threshold ? idx : acc, 0);
-          const stageInfo = STAGES[stageIdx];
+          const { stageInfo, stageIdx, formVariant } = getFormStageInfo(exp, parsed.foodStats);
           const discovered = Array.from(new Set([...(parsed.discoveredStages || []), stageInfo.name]));
           
           return {
@@ -184,6 +405,7 @@ export default function Dashboard() {
             ...parsed,
             name: stageInfo.name,
             stage: stageIdx,
+            formVariant: formVariant,
             gasWebAppUrl: DEFAULT_GAS_URL,
             points: parsed.points !== undefined ? parsed.points : 150,
             furniture: parsed.furniture || [],
@@ -191,7 +413,8 @@ export default function Dashboard() {
             sprayCount: parsed.sprayCount !== undefined ? parsed.sprayCount : 0,
             daycareUntil: parsed.daycareUntil || null,
             darlingIncident: parsed.darlingIncident || false,
-            darlingMoodTarget: parsed.darlingMoodTarget || (Math.floor(Math.random() * 990) + 10) / 10
+            darlingMoodTarget: parsed.darlingMoodTarget || (Math.floor(Math.random() * 990) + 10) / 10,
+            foodStats: parsed.foodStats || { cabbage: 0, apple: 0, glucose: 0, sugar: 0, twig: 0 }
           };
         }
       } catch (e) {
@@ -211,7 +434,7 @@ export default function Dashboard() {
     }
   }, [data, mounted]);
 
-  // Check 3-day inactivity (72 hours) for Darling-chan incident
+  // Check 3-day inactivity (72 hours) for Darling-chan incident (No incident during sleep hours 23:00 - 07:00)
   useEffect(() => {
     if (!mounted) return;
     const timeoutId = setTimeout(() => {
@@ -219,10 +442,11 @@ export default function Dashboard() {
       const lastActivity = new Date(data.lastFedAt || data.lastMessageAt || 0).getTime();
       const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
 
-      // Check if daycare is currently active
+      // Check if daycare is currently active or sleep time
       const isDaycareActive = data.daycareUntil && new Date(data.daycareUntil).getTime() > now;
+      const isCurrentlySleep = isSleepingTime();
 
-      if (!isDaycareActive && (now - lastActivity > threeDaysMs) && !data.darlingIncident) {
+      if (!isDaycareActive && !isCurrentlySleep && (now - lastActivity > threeDaysMs) && !data.darlingIncident) {
         setData(prev => ({
           ...prev,
           darlingIncident: true,
@@ -357,14 +581,11 @@ export default function Dashboard() {
   };
 
   // Stage calculation
-  const currentStageIndex = STAGES.reduce((acc, stage, idx) => {
-    return data.exp >= stage.threshold ? idx : acc;
-  }, 0);
-  const currentStage = STAGES[currentStageIndex];
-  const nextStage = STAGES[currentStageIndex + 1];
+  const { stageInfo: currentStage, stageIdx: currentStageIndex, formVariant: currentFormVariant } = getFormStageInfo(data.exp, data.foodStats);
+  const nextStage = ALL_ENCYCLOPEDIA_STAGES.find(s => s.threshold > data.exp && s.category === currentStage.category) || ALL_ENCYCLOPEDIA_STAGES.find(s => s.threshold > data.exp);
 
-  // Feed handler: High EXP gain, small point gain
-  const handleFeed = useCallback((expGain: number, foodName: string) => {
+  // Feed handler: High EXP gain, small point gain with food-based branch evolution
+  const handleFeed = useCallback((expGain: number, foodName: string, foodType?: string) => {
     setData(prev => {
       const newExp = prev.exp + expGain;
       const pointBonus = Math.max(5, Math.floor(expGain * 0.4));
@@ -372,12 +593,20 @@ export default function Dashboard() {
       const timeStr = new Date().toLocaleTimeString();
       const logText = `エサ「${foodName}」を摂取 (+${expGain} EXP, +${pointBonus}pt)`;
 
-      const prevStageIdx = STAGES.reduce((acc, stage, idx) => prev.exp >= stage.threshold ? idx : acc, 0);
-      const newStageIdx = STAGES.reduce((acc, stage, idx) => newExp >= stage.threshold ? idx : acc, 0);
-      const stageInfo = STAGES[newStageIdx];
+      const currentStats = prev.foodStats || { cabbage: 0, apple: 0, glucose: 0, sugar: 0, twig: 0 };
+      const newFoodStats = { ...currentStats };
+      if (foodType === 'cabbage') newFoodStats.cabbage = (newFoodStats.cabbage || 0) + 1;
+      else if (foodType === 'apple') newFoodStats.apple = (newFoodStats.apple || 0) + 1;
+      else if (foodType === 'glucose') newFoodStats.glucose = (newFoodStats.glucose || 0) + 1;
+      else if (foodType === 'sugar') newFoodStats.sugar = (newFoodStats.sugar || 0) + 1;
+      else if (foodType === 'twig') newFoodStats.twig = (newFoodStats.twig || 0) + 1;
+      else newFoodStats.cabbage = (newFoodStats.cabbage || 0) + 1;
+
+      const { stageIdx: prevStageIdx } = getFormStageInfo(prev.exp, prev.foodStats);
+      const { stageInfo, stageIdx: newStageIdx, formVariant } = getFormStageInfo(newExp, newFoodStats);
       const newDiscovered = Array.from(new Set([...(prev.discoveredStages || []), stageInfo.name]));
 
-      if (newStageIdx > prevStageIdx) {
+      if (newStageIdx > prevStageIdx || stageInfo.name !== prev.name) {
         setEvolutionNotice(stageInfo);
         appendLogToGas(prev.gasWebAppUrl, 'EVOLUTION', `【形態進化】「${stageInfo.name}」へ羽化・変態。規律パラメータ更新。`, 0, prev.uid);
       }
@@ -388,6 +617,8 @@ export default function Dashboard() {
         points: newPoints,
         name: stageInfo.name,
         stage: newStageIdx,
+        formVariant: formVariant,
+        foodStats: newFoodStats,
         discoveredStages: newDiscovered,
         lastFedAt: new Date().toISOString(),
         logs: [{ time: timeStr, text: logText }, ...prev.logs.slice(0, 19)]
@@ -405,14 +636,14 @@ export default function Dashboard() {
       const timeStr = new Date().toLocaleTimeString();
       const logText = `⚠️【構造破壊警報】${reason} (-${expLoss} EXP)`;
 
-      const newStageIdx = STAGES.reduce((acc, stage, idx) => newExp >= stage.threshold ? idx : acc, 0);
-      const stageInfo = STAGES[newStageIdx];
+      const { stageInfo, stageIdx: newStageIdx, formVariant } = getFormStageInfo(newExp, prev.foodStats);
       
       const updated: CaterpillarData = {
         ...prev,
         exp: newExp,
         name: stageInfo.name,
         stage: newStageIdx,
+        formVariant: formVariant,
         logs: [{ time: timeStr, text: logText }, ...prev.logs.slice(0, 19)]
       };
 
@@ -429,12 +660,11 @@ export default function Dashboard() {
       const timeStr = new Date().toLocaleTimeString();
       const logText = `訓練「${gameName}」修了 (+${pointsGained}pt, +${expGained}EXP)`;
 
-      const prevStageIdx = STAGES.reduce((acc, stage, idx) => prev.exp >= stage.threshold ? idx : acc, 0);
-      const newStageIdx = STAGES.reduce((acc, stage, idx) => newExp >= stage.threshold ? idx : acc, 0);
-      const stageInfo = STAGES[newStageIdx];
+      const { stageIdx: prevStageIdx } = getFormStageInfo(prev.exp, prev.foodStats);
+      const { stageInfo, stageIdx: newStageIdx, formVariant } = getFormStageInfo(newExp, prev.foodStats);
       const newDiscovered = Array.from(new Set([...(prev.discoveredStages || []), stageInfo.name]));
 
-      if (newStageIdx > prevStageIdx) {
+      if (newStageIdx > prevStageIdx || stageInfo.name !== prev.name) {
         setEvolutionNotice(stageInfo);
         appendLogToGas(prev.gasWebAppUrl, 'EVOLUTION', `【形態進化】「${stageInfo.name}」へ羽化・変態。規律パラメータ更新。`, 0, prev.uid);
       }
@@ -445,15 +675,15 @@ export default function Dashboard() {
         exp: newExp,
         name: stageInfo.name,
         stage: newStageIdx,
+        formVariant: formVariant,
         discoveredStages: newDiscovered,
         logs: [{ time: timeStr, text: logText }, ...prev.logs.slice(0, 19)]
       };
 
-      appendLogToGas(prev.gasWebAppUrl, 'TRAINING', logText, expGained, prev.uid);
-      triggerGasSync(updated);
+      appendLogToGas(prev.gasWebAppUrl, 'GAME', logText, expGained, prev.uid);
       return updated;
     });
-  }, [triggerGasSync]);
+  }, []);
 
   // Shop purchase: Furniture
   const handleBuyFurniture = useCallback((item: FurnitureItem) => {
@@ -834,6 +1064,7 @@ export default function Dashboard() {
               <CaterpillarRoom 
                 onFeed={handleFeed} 
                 stage={data.stage} 
+                formVariant={data.formVariant || currentFormVariant}
                 ownedFurniture={data.furniture}
                 onSquashLevelDown={handleSquashLevelDown}
                 sprayCount={data.sprayCount || 0}
@@ -1048,12 +1279,16 @@ export default function Dashboard() {
           <div className="bg-white border-2 border-stone-300 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col gap-5">
             
             {/* Clerk Box */}
-            <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4">
-              <div className="relative w-16 h-16 rounded-full bg-emerald-200 border-2 border-emerald-500 flex items-center justify-center shrink-0 shadow-md overflow-hidden">
+            <div 
+              onClick={rollClerkQuote}
+              className="bg-emerald-50 hover:bg-emerald-100/80 transition-colors border-2 border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4 cursor-pointer select-none group"
+              title="クリックで店員の規律アドバイスを切り替え"
+            >
+              <div className="relative w-16 h-16 rounded-full bg-emerald-200 border-2 border-emerald-500 flex items-center justify-center shrink-0 shadow-md overflow-hidden group-hover:scale-105 transition-transform">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img 
                   src="/images/staff.png" 
-                  alt="店員" 
+                  alt="LSI店員" 
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     // Fallback to cute avatar if image doesn't exist
@@ -1066,9 +1301,15 @@ export default function Dashboard() {
               </div>
 
               <div className="flex-1 text-center sm:text-left">
-                <span className="text-[10px] font-black bg-emerald-800 text-white px-2 py-0.5 rounded">
-                  購買部 規律相談窓口
-                </span>
+                <div className="flex items-center justify-center sm:justify-start gap-2">
+                  <span className="text-[10px] font-black bg-emerald-800 text-white px-2 py-0.5 rounded">
+                    購買部 LSI規律相談窓口
+                  </span>
+                  <span className="text-[10px] text-emerald-700 font-bold opacity-80 group-hover:opacity-100 flex items-center gap-0.5">
+                    <Sparkles className="w-3 h-3" />
+                    <span>相談する（クリック）</span>
+                  </span>
+                </div>
                 <p className="text-xs sm:text-sm font-bold text-stone-800 mt-1 leading-relaxed">
                   {clerkQuote}
                 </p>
@@ -1395,9 +1636,9 @@ export default function Dashboard() {
               </div>
 
               <div className="flex flex-col gap-3">
-                {STAGES.map((s, idx) => {
-                  const isDiscovered = data.discoveredStages?.includes(s.name) || data.exp >= s.threshold;
-                  const isCurrent = data.stage === idx;
+                {ALL_ENCYCLOPEDIA_STAGES.map((s) => {
+                  const isDiscovered = data.discoveredStages?.includes(s.name) || data.name === s.name;
+                  const isCurrent = data.name === s.name;
 
                   return (
                     <div 
@@ -1412,28 +1653,50 @@ export default function Dashboard() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-xl bg-stone-100 border border-stone-200 flex items-center justify-center text-3xl shrink-0">
-                            {isDiscovered ? s.visual : '❓'}
+                          <div className="w-14 h-14 rounded-xl bg-stone-100 border border-stone-200 flex items-center justify-center text-3xl shrink-0 overflow-hidden p-1">
+                            {isDiscovered ? (
+                              s.chrysalisVariant ? (
+                                <ChrysalisSVG variant={s.chrysalisVariant} size={48} />
+                              ) : (
+                                <span>{s.visual}</span>
+                              )
+                            ) : (
+                              <span>❓</span>
+                            )}
                           </div>
                           <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="text-[10px] font-black bg-stone-800 text-white px-2 py-0.2 rounded">
                                 {s.badge}
                               </span>
+                              {s.category && (
+                                <span className={`text-[10px] font-black px-2 py-0.2 rounded ${
+                                  s.category === 'Ti' ? 'bg-blue-100 text-blue-800' :
+                                  s.category === 'Se' ? 'bg-rose-100 text-rose-800' :
+                                  s.category === 'Ne' ? 'bg-emerald-100 text-emerald-800' :
+                                  s.category === 'Fe' ? 'bg-amber-100 text-amber-800' :
+                                  'bg-stone-200 text-stone-700'
+                                }`}>
+                                  {s.category === 'Ti' ? 'Ti論理構造' :
+                                   s.category === 'Se' ? 'Se物理防壁' :
+                                   s.category === 'Ne' ? 'Ne電脳解析' :
+                                   s.category === 'Fe' ? 'Fe黄金調和' : '基本'}
+                                </span>
+                              )}
                               {isCurrent && (
-                                <span className="text-[10px] font-black bg-emerald-600 text-white px-2 py-0.2 rounded">
+                                <span className="text-[10px] font-black bg-emerald-600 text-white px-2 py-0.2 rounded animate-pulse">
                                   現在形態
                                 </span>
                               )}
                             </div>
-                            <h4 className="font-black text-sm text-stone-900 mt-0.5">
+                            <h4 className="font-black text-sm text-stone-900 mt-1">
                               {isDiscovered ? s.name : '？？？（未解放形態）'}
                             </h4>
                           </div>
                         </div>
 
                         <span className="text-xs font-black text-stone-500 shrink-0">
-                          必要EXP: {s.threshold}
+                          EXP {s.threshold}
                         </span>
                       </div>
 

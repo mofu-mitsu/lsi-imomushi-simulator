@@ -23,7 +23,10 @@ export interface CaterpillarData {
     cabbage: number;
     apple: number;
     glucose: number;
+    sugar: number;
+    twig: number;
   };
+  formVariant?: string;
   evolutionBranch?: string;
 }
 
@@ -51,7 +54,15 @@ export const DEFAULT_CATERPILLAR_DATA: CaterpillarData = {
   sprayCount: 0,
   daycareUntil: null,
   darlingIncident: false,
-  darlingMoodTarget: 50
+  darlingMoodTarget: 50,
+  foodStats: {
+    cabbage: 0,
+    apple: 0,
+    glucose: 0,
+    sugar: 0,
+    twig: 0
+  },
+  formVariant: 'crystal'
 };
 
 // Load status from user's Google Apps Script (GAS) Web App

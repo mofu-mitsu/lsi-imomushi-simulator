@@ -67,6 +67,18 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
     <html lang="ja">
       <head>
         <Script src="https://accounts.google.com/gsi/client" strategy="beforeInteractive" />
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-GNTX973GET"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-GNTX973GET');
+          `}
+        </Script>
       </head>
       <body suppressHydrationWarning>{children}</body>
     </html>
