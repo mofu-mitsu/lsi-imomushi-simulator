@@ -1,0 +1,209 @@
+/**
+ * 🐛 LSI芋虫 育成・統制シミュレーター用 Google Apps Script (GAS)
+ * 
+ * 【Googleアカウント毎の個別データ保存・復元対応版】
+ * 
+ * 【導入手順】
+ * 1. お手持ちの Google スプレッドシート を開きます。
+ * 2. 上部メニューの「拡張機能」 > 「Apps Script」を開きます。
+ * 3. エディタ内のコードをすべて削除し、このファイルの内容を貼り付けて保存（Ctrl+S / Cmd+S）します。
+ * 4. 画面右上の「デプロイ」 > 「新しいデプロイ」をクリックします。
+ * 5. 種類を「ウェブアプリ」にし、以下を設定します：
+ *    - 次のユーザーとして実行: 「自分」
+ *    - アクセスできるユーザー: 「全員」
+ * 6. 「デプロイ」を押して表示された「ウェブアプリ URL」をコピーし、
+ *    LSI芋虫アプリの「GAS URL設定」に入力すれば連携完了です！
+ */
+
+function doGet(e) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    initSheetsIfNeeded(ss);
+    
+    const action = (e && e.parameter && e.parameter.action) || 'getStatus';
+    const uid = (e && e.parameter && e.parameter.uid) || '';
+    
+    if (action === 'getStatus' || action === 'getUserStatus') {
+      const sheet = ss.getSheetByName('個体ステータス_アカウント別');
+      if (!sheet) {
+        return createJsonResponse({ success: false, error: 'Sheet not found' });
+      }
+      
+      const data = sheet.getDataRange().getValues();
+      // Look for row matching UID
+      if (uid && data.length > 1) {
+        for (let i = 1; i < data.length; i++) {
+          if (String(data[i][0]) === String(uid)) {
+            const userObj = {
+              uid: data[i][0],
+              ownerName: data[i][1],
+              selfType: data[i][2],
+              id: data[i][3],
+              name: data[i][4],
+              stage: Number(data[i][5]) || 0,
+              exp: Number(data[i][6]) || 0,
+              points: Number(data[i][7]) || 0,
+              furniture: data[i][8] ? JSON.parse(data[i][8]) : [],
+              discoveredStages: data[i][9] ? JSON.parse(data[i][9]) : [],
+              lastFedAt: data[i][10],
+              lastMessageAt: data[i][11]
+            };
+            return createJsonResponse({ success: true, data: userObj });
+          }
+        }
+      }
+      
+      // Fallback: If not found or no UID, return the first entry or empty
+      if (data.length > 1) {
+        const first = data[1];
+        return createJsonResponse({ 
+          success: true, 
+          data: {
+            uid: first[0],
+            ownerName: first[1],
+            selfType: first[2],
+            id: first[3],
+            name: first[4],
+            stage: Number(first[5]) || 0,
+            exp: Number(first[6]) || 0,
+            points: Number(first[7]) || 0,
+            furniture: first[8] ? JSON.parse(first[8]) : [],
+            discoveredStages: first[9] ? JSON.parse(first[9]) : [],
+            lastFedAt: first[10],
+            lastMessageAt: first[11]
+          }
+        });
+      }
+      
+      return createJsonResponse({ success: true, data: null });
+    }
+    
+    return createJsonResponse({ success: true, message: 'LSI Caterpillar GAS Backend is running.' });
+  } catch (error) {
+    return createJsonResponse({ success: false, error: error.toString() });
+  }
+}
+
+function doPost(e) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    initSheetsIfNeeded(ss);
+    
+    const postData = JSON.parse(e.postData.contents);
+    const action = postData.action;
+    const nowStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
+    
+    if (action === 'saveStatus') {
+      const sheet = ss.getSheetByName('個体ステータス_アカウント別');
+      const data = postData.data;
+      const targetUid = String(data.uid || 'guest_default');
+      
+      const values = sheet.getDataRange().getValues();
+      let targetRowIndex = -1;
+      
+      // Check existing UID
+      for (let i = 1; i < values.length; i++) {
+        if (String(values[i][0]) === targetUid) {
+          targetRowIndex = i + 1;
+          break;
+        }
+      }
+      
+      const rowData = [
+        targetUid,
+        data.ownerName || '未設定',
+        data.selfType || '未設定',
+        data.id || '000001',
+        data.name || 'LSI芋虫',
+        data.stage !== undefined ? data.stage : 0,
+        data.exp !== undefined ? data.exp : 0,
+        data.points !== undefined ? data.points : 0,
+        JSON.stringify(data.furniture || []),
+        JSON.stringify(data.discoveredStages || []),
+        data.lastFedAt || nowStr,
+        data.lastMessageAt || nowStr,
+        nowStr
+      ];
+      
+      if (targetRowIndex > 0) {
+        // Update existing row
+        sheet.getRange(targetRowIndex, 1, 1, rowData.length).setValues([rowData]);
+      } else {
+        // Append new row for this user
+        sheet.appendRow(rowData);
+      }
+      
+      return createJsonResponse({ success: true, message: 'Status saved for UID: ' + targetUid });
+    }
+    
+    if (action === 'appendLog') {
+      const sheet = ss.getSheetByName('行動ログ');
+      sheet.appendRow([
+        nowStr,
+        postData.uid || 'guest',
+        postData.type || '一般',
+        postData.detail || '',
+        postData.expChange || 0
+      ]);
+      return createJsonResponse({ success: true, message: 'Log appended.' });
+    }
+    
+    if (action === 'appendChat') {
+      const sheet = ss.getSheetByName('交信記録');
+      sheet.appendRow([
+        nowStr,
+        postData.uid || 'guest',
+        postData.sender || '発言者',
+        postData.message || ''
+      ]);
+      return createJsonResponse({ success: true, message: 'Chat recorded.' });
+    }
+    
+    return createJsonResponse({ success: false, error: 'Unknown action: ' + action });
+  } catch (error) {
+    return createJsonResponse({ success: false, error: error.toString() });
+  }
+}
+
+function initSheetsIfNeeded(ss) {
+  let statusSheet = ss.getSheetByName('個体ステータス_アカウント別');
+  if (!statusSheet) {
+    statusSheet = ss.insertSheet('個体ステータス_アカウント別');
+    const headers = [
+      'UID (アカウント識別子)', 
+      '飼育員名', 
+      '自認タイプ', 
+      '個体ID', 
+      '名前・肩書', 
+      '進化段階', 
+      '獲得EXP', 
+      '統制ポイント', 
+      '所有家具', 
+      'アンロック図鑑',
+      '最終給餌日時', 
+      '最終交信日時', 
+      '最終更新日時'
+    ];
+    statusSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    statusSheet.getRange(1, 1, 1, headers.length).setBackground('#d1fae5').setFontWeight('bold');
+  }
+  
+  let logSheet = ss.getSheetByName('行動ログ');
+  if (!logSheet) {
+    logSheet = ss.insertSheet('行動ログ');
+    logSheet.getRange(1, 1, 1, 5).setValues([['タイムスタンプ', 'UID', '種別', '観測イベント内容', '獲得EXP']]);
+    logSheet.getRange(1, 1, 1, 5).setBackground('#d1fae5').setFontWeight('bold');
+  }
+  
+  let chatSheet = ss.getSheetByName('交信記録');
+  if (!chatSheet) {
+    chatSheet = ss.insertSheet('交信記録');
+    chatSheet.getRange(1, 1, 1, 4).setValues([['日時', 'UID', '発信者', '発言内容']]);
+    chatSheet.getRange(1, 1, 1, 4).setBackground('#d1fae5').setFontWeight('bold');
+  }
+}
+
+function createJsonResponse(data) {
+  return ContentService.createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}

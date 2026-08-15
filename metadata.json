@@ -1,0 +1,6 @@
+{
+  "name": "🐛 LSI芋虫 育成・統制シミュレーター",
+  "description": "LSI/FVLEの思考特性を持つ芋虫を育成・観察・規律訓練するシミュレーションゲーム。Googleスプレッドシート完全連携。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

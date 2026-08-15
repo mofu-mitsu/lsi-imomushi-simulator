@@ -1,0 +1,1611 @@
+'use client';
+
+import { useState, useEffect, useCallback, useSyncExternalStore } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  Bug, 
+  Gamepad2, 
+  Eye, 
+  Store, 
+  Coins, 
+  UserCheck, 
+  LogIn, 
+  LogOut, 
+  Share2, 
+  Check, 
+  Edit3, 
+  RotateCcw, 
+  Clock, 
+  Send,
+  BookOpen,
+  Settings,
+  Sparkles,
+  Award,
+  ShieldCheck,
+  ChevronRight,
+  X,
+  HelpCircle,
+  Wind,
+  Home,
+  ShieldAlert,
+  AlertTriangle
+} from 'lucide-react';
+import CaterpillarRoom, { AVAILABLE_FURNITURE, DAILY_SCHEDULE, getCurrentSchedule, FurnitureItem } from './CaterpillarRoom';
+import MiniGames from './MiniGames';
+import { 
+  CaterpillarData, 
+  DEFAULT_CATERPILLAR_DATA, 
+  DEFAULT_GAS_URL,
+  loadFromGas,
+  syncWithGas, 
+  appendLogToGas, 
+  appendChatToGas 
+} from '@/lib/google-sheets';
+import { auth, googleAuthProvider } from '@/lib/firebase';
+import { signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
+
+export interface StageInfo {
+  stageNumber: number;
+  name: string;
+  badge: string;
+  threshold: number;
+  desc: string;
+  visual: string;
+  disciplineTitle: string;
+  flavorQuote: string;
+  hint: string;
+}
+
+export const STAGES: StageInfo[] = [
+  { 
+    stageNumber: 0,
+    name: 'LSI芋虫（幼虫）', 
+    badge: 'STAGE 0', 
+    threshold: 0, 
+    desc: '境界線をミリ単位で確認し、テリトリーの規律を監視している。',
+    visual: '🐛',
+    disciplineTitle: '【初期段階】不可侵領土の確保と境界線監査',
+    flavorQuote: '「ミリ単位の狂いも許さん。ここが我が不可侵領土だ」',
+    hint: '最初から解放されています。'
+  },
+  { 
+    stageNumber: 1,
+    name: '規律の幼虫・課長級', 
+    badge: 'STAGE 1', 
+    threshold: 100, 
+    desc: '毎朝の構造化目標を強制提示し、エサの消化ペースを厳格に指示する。',
+    visual: '🐛',
+    disciplineTitle: '【物理統制】Se空間支配と消化ノルマ厳守',
+    flavorQuote: '「モゾ……朝会プロトコル開始。本日の消化ノルマを厳格に履行せよ」',
+    hint: 'EXP 100 達成で羽化準備に入ります。'
+  },
+  { 
+    stageNumber: 2,
+    name: '鋼鉄のシェルターさなぎ', 
+    badge: 'STAGE 2 🛡️', 
+    threshold: 250, 
+    desc: '外殻を高密度合金で固めた不可侵の繭。内部で論理構造の超圧縮再構築を行う。',
+    visual: '🛡️',
+    disciplineTitle: '【要塞化】不可侵シェルターによる完全防衛と内部構造化',
+    flavorQuote: '「外部のノイズは全て遮断した。我が繭は難攻不落の要塞である」',
+    hint: 'EXP 250 達成でさなぎ（防壁シェルター）に変態します。'
+  },
+  { 
+    stageNumber: 3,
+    name: '立方体クリスタルさなぎ', 
+    badge: 'STAGE 3 💎', 
+    threshold: 450, 
+    desc: '全方向が完全な直角と平面で構成された水晶の蛹。光の屈折率まで規律通りに制御。',
+    visual: '💎',
+    disciplineTitle: '【論理結晶】直角幾何学と多面体屈折率の完全制御',
+    flavorQuote: '「歪みは分子レベルで排除された。完全なる直角幾何学の結晶体を見よ」',
+    hint: 'EXP 450 達成でクリスタル結晶さなぎへ進化します。'
+  },
+  { 
+    stageNumber: 4,
+    name: '空間統制の成熟蛹', 
+    badge: 'STAGE 4 💠', 
+    threshold: 700, 
+    desc: '羽化直前の超高密度エネルギー蛹。ケージ全域の重力場と空間座標をすでに掌握している。',
+    visual: '💠',
+    disciplineTitle: '【覚醒前夜】領域全域の座標掌握と羽化カウントダウン',
+    flavorQuote: '「ケージの全座標データは掌握済みだ。完全羽化の時を待て」',
+    hint: 'EXP 700 達成で成熟蛹へ覚醒します。'
+  },
+  { 
+    stageNumber: 5,
+    name: '構造化アゲハ完全体', 
+    badge: 'MAX STAGE 🦋', 
+    threshold: 1000, 
+    desc: '領域展開完了。ケージの概念を超越した完全な論理と物理の統制蝶へ羽化した。',
+    visual: '🦋',
+    disciplineTitle: '【完全羽化】絶対的論理空間の構築と普遍的秩序展開',
+    flavorQuote: '「領域展開。ケージの境界線は今や全世界へと拡張された」',
+    hint: 'EXP 1000 達成で完全体蝶へ最終羽化します！'
+  }
+];
+
+const LOCAL_STORAGE_KEY = 'lsi_caterpillar_data_v7';
+
+const emptySubscribe = () => () => {};
+function useIsClient() {
+  return useSyncExternalStore(emptySubscribe, () => true, () => false);
+}
+
+export default function Dashboard() {
+  const mounted = useIsClient();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [activeTab, setActiveTab] = useState<'status' | 'observation' | 'shop' | 'training' | 'chat'>('status');
+  
+  // Modals
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isEncyclopediaOpen, setIsEncyclopediaOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+
+  // Editing profile temporary states
+  const [tempName, setTempName] = useState('');
+  const [tempType, setTempType] = useState('');
+  const [copiedShare, setCopiedShare] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
+
+  // Chat state
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'lsi'; text: string; provider?: string }[]>([
+    { role: 'lsi', text: '……システム起動完了。個体識別：LSI芋虫。環境の構造解析および境界線点検を開始する。' }
+  ]);
+  const [inputText, setInputText] = useState('');
+  const [isChatting, setIsChatting] = useState(false);
+
+  // Evolution notice
+  const [evolutionNotice, setEvolutionNotice] = useState<StageInfo | null>(null);
+
+  // Shop clerk dialogue state
+  const [clerkQuote, setClerkQuote] = useState('「いらっしゃいませ。当店の商品は全てJIS規格およびLSI統制基準を満たしております。規律ある設備投資をご検討ください。」');
+
+  // Safe initial local data fetcher
+  const [data, setData] = useState<CaterpillarData>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          const exp = typeof parsed.exp === 'number' ? parsed.exp : 0;
+          const stageIdx = STAGES.reduce((acc, stage, idx) => exp >= stage.threshold ? idx : acc, 0);
+          const stageInfo = STAGES[stageIdx];
+          const discovered = Array.from(new Set([...(parsed.discoveredStages || []), stageInfo.name]));
+          
+          return {
+            ...DEFAULT_CATERPILLAR_DATA,
+            ...parsed,
+            name: stageInfo.name,
+            stage: stageIdx,
+            gasWebAppUrl: DEFAULT_GAS_URL,
+            points: parsed.points !== undefined ? parsed.points : 150,
+            furniture: parsed.furniture || [],
+            discoveredStages: discovered,
+            sprayCount: parsed.sprayCount !== undefined ? parsed.sprayCount : 0,
+            daycareUntil: parsed.daycareUntil || null,
+            darlingIncident: parsed.darlingIncident || false,
+            darlingMoodTarget: parsed.darlingMoodTarget || Math.floor(Math.random() * 100) + 1
+          };
+        }
+      } catch (e) {
+        console.error('Failed to load initial storage:', e);
+      }
+    }
+    return DEFAULT_CATERPILLAR_DATA;
+  });
+
+  // Save to localStorage whenever data changes
+  useEffect(() => {
+    if (!mounted) return;
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+      console.error('Failed to save to localStorage:', e);
+    }
+  }, [data, mounted]);
+
+  // Check 3-day inactivity (72 hours) for Darling-chan incident
+  useEffect(() => {
+    if (!mounted) return;
+    const now = Date.now();
+    const lastActivity = new Date(data.lastFedAt || data.lastMessageAt || 0).getTime();
+    const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+
+    // Check if daycare is currently active
+    const isDaycareActive = data.daycareUntil && new Date(data.daycareUntil).getTime() > now;
+
+    if (!isDaycareActive && (now - lastActivity > threeDaysMs) && !data.darlingIncident) {
+      setData(prev => ({
+        ...prev,
+        darlingIncident: true,
+        darlingMoodTarget: Math.floor(Math.random() * 100) + 1,
+        logs: [
+          { time: new Date().toLocaleTimeString(), text: '🚨【物理崩壊インシデント】3日間放置されたため、ILIダーリンちゃんにケージを占拠された！' },
+          ...prev.logs.slice(0, 19)
+        ]
+      }));
+    }
+  }, [mounted, data.lastFedAt, data.lastMessageAt, data.daycareUntil, data.darlingIncident]);
+
+  // Auth state change & Automatic multi-account GAS synchronization
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setCurrentUser(user);
+      if (user) {
+        setSyncStatus('syncing');
+        try {
+          const res = await loadFromGas(DEFAULT_GAS_URL, user.uid);
+          if (res.success && res.data) {
+            const fetched = res.data;
+            const exp = typeof fetched.exp === 'number' ? fetched.exp : 0;
+            const stageIdx = STAGES.reduce((acc, stage, idx) => exp >= stage.threshold ? idx : acc, 0);
+            const stageInfo = STAGES[stageIdx];
+            const discovered = Array.from(new Set([...(fetched.discoveredStages || []), stageInfo.name]));
+
+            setData(prev => ({
+              ...prev,
+              ...fetched,
+              name: stageInfo.name,
+              stage: stageIdx,
+              discoveredStages: discovered,
+              uid: user.uid,
+              ownerName: fetched.ownerName || (user.displayName || '飼育員'),
+              gasWebAppUrl: DEFAULT_GAS_URL
+            }));
+            setSyncStatus('synced');
+          } else {
+            setData(prev => ({
+              ...prev,
+              uid: user.uid,
+              ownerName: prev.ownerName === '未設定' ? (user.displayName || '飼育員') : prev.ownerName
+            }));
+            setSyncStatus('idle');
+          }
+        } catch (e) {
+          console.error('Failed to auto-load from GAS:', e);
+          setSyncStatus('error');
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Sync to GAS Helper
+  const triggerGasSync = useCallback(async (currentData: CaterpillarData) => {
+    setSyncStatus('syncing');
+    try {
+      const res = await syncWithGas(currentData.gasWebAppUrl, currentData);
+      if (res.success) {
+        setSyncStatus('synced');
+        setTimeout(() => setSyncStatus('idle'), 3000);
+      } else {
+        setSyncStatus('error');
+      }
+    } catch {
+      setSyncStatus('error');
+    }
+  }, []);
+
+  // Google Sign In
+  const handleGoogleLogin = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleAuthProvider);
+      const user = result.user;
+      if (user) {
+        const res = await loadFromGas(DEFAULT_GAS_URL, user.uid);
+        if (res.success && res.data) {
+          const fetched = res.data;
+          const exp = typeof fetched.exp === 'number' ? fetched.exp : 0;
+          const stageIdx = STAGES.reduce((acc, stage, idx) => exp >= stage.threshold ? idx : acc, 0);
+          const stageInfo = STAGES[stageIdx];
+          const discovered = Array.from(new Set([...(fetched.discoveredStages || []), stageInfo.name]));
+
+          const updated = {
+            ...DEFAULT_CATERPILLAR_DATA,
+            ...fetched,
+            name: stageInfo.name,
+            stage: stageIdx,
+            discoveredStages: discovered,
+            uid: user.uid,
+            ownerName: fetched.ownerName || user.displayName || '飼育員',
+            gasWebAppUrl: DEFAULT_GAS_URL
+          };
+          setData(updated);
+        } else {
+          setData(prev => {
+            const updated = {
+              ...prev,
+              uid: user.uid,
+              ownerName: prev.ownerName === '未設定' ? (user.displayName || '飼育員') : prev.ownerName
+            };
+            triggerGasSync(updated);
+            return updated;
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Google login error:', e);
+    }
+  };
+
+  // Google Sign Out
+  const handleGoogleLogout = async () => {
+    try {
+      await signOut(auth);
+      setCurrentUser(null);
+      setData(prev => ({ ...prev, uid: undefined }));
+    } catch (e) {
+      console.error('Google logout error:', e);
+    }
+  };
+
+  // Stage calculation
+  const currentStageIndex = STAGES.reduce((acc, stage, idx) => {
+    return data.exp >= stage.threshold ? idx : acc;
+  }, 0);
+  const currentStage = STAGES[currentStageIndex];
+  const nextStage = STAGES[currentStageIndex + 1];
+
+  // Feed handler: High EXP gain, small point gain
+  const handleFeed = useCallback((expGain: number, foodName: string) => {
+    setData(prev => {
+      const newExp = prev.exp + expGain;
+      const pointBonus = Math.max(5, Math.floor(expGain * 0.4));
+      const newPoints = prev.points + pointBonus;
+      const timeStr = new Date().toLocaleTimeString();
+      const logText = `エサ「${foodName}」を摂取 (+${expGain} EXP, +${pointBonus}pt)`;
+
+      const prevStageIdx = STAGES.reduce((acc, stage, idx) => prev.exp >= stage.threshold ? idx : acc, 0);
+      const newStageIdx = STAGES.reduce((acc, stage, idx) => newExp >= stage.threshold ? idx : acc, 0);
+      const stageInfo = STAGES[newStageIdx];
+      const newDiscovered = Array.from(new Set([...(prev.discoveredStages || []), stageInfo.name]));
+
+      if (newStageIdx > prevStageIdx) {
+        setEvolutionNotice(stageInfo);
+        appendLogToGas(prev.gasWebAppUrl, 'EVOLUTION', `【形態進化】「${stageInfo.name}」へ羽化・変態。規律パラメータ更新。`, 0, prev.uid);
+      }
+      
+      const updated: CaterpillarData = {
+        ...prev,
+        exp: newExp,
+        points: newPoints,
+        name: stageInfo.name,
+        stage: newStageIdx,
+        discoveredStages: newDiscovered,
+        lastFedAt: new Date().toISOString(),
+        logs: [{ time: timeStr, text: logText }, ...prev.logs.slice(0, 19)]
+      };
+      
+      appendLogToGas(prev.gasWebAppUrl, 'FEED', logText, expGain, prev.uid);
+      return updated;
+    });
+  }, []);
+
+  // Squash Level Down Handler
+  const handleSquashLevelDown = useCallback((expLoss: number, reason: string) => {
+    setData(prev => {
+      const newExp = Math.max(0, prev.exp - expLoss);
+      const timeStr = new Date().toLocaleTimeString();
+      const logText = `⚠️【構造破壊警報】${reason} (-${expLoss} EXP)`;
+
+      const newStageIdx = STAGES.reduce((acc, stage, idx) => newExp >= stage.threshold ? idx : acc, 0);
+      const stageInfo = STAGES[newStageIdx];
+      
+      const updated: CaterpillarData = {
+        ...prev,
+        exp: newExp,
+        name: stageInfo.name,
+        stage: newStageIdx,
+        logs: [{ time: timeStr, text: logText }, ...prev.logs.slice(0, 19)]
+      };
+
+      appendLogToGas(prev.gasWebAppUrl, 'PENALTY', logText, -expLoss, prev.uid);
+      return updated;
+    });
+  }, []);
+
+  // Mini-game reward handler: High points (Coins), low EXP
+  const handleMiniGameReward = useCallback((pointsGained: number, expGained: number, gameName: string) => {
+    setData(prev => {
+      const newPoints = prev.points + pointsGained;
+      const newExp = prev.exp + expGained;
+      const timeStr = new Date().toLocaleTimeString();
+      const logText = `訓練「${gameName}」修了 (+${pointsGained}pt, +${expGained}EXP)`;
+
+      const prevStageIdx = STAGES.reduce((acc, stage, idx) => prev.exp >= stage.threshold ? idx : acc, 0);
+      const newStageIdx = STAGES.reduce((acc, stage, idx) => newExp >= stage.threshold ? idx : acc, 0);
+      const stageInfo = STAGES[newStageIdx];
+      const newDiscovered = Array.from(new Set([...(prev.discoveredStages || []), stageInfo.name]));
+
+      if (newStageIdx > prevStageIdx) {
+        setEvolutionNotice(stageInfo);
+        appendLogToGas(prev.gasWebAppUrl, 'EVOLUTION', `【形態進化】「${stageInfo.name}」へ羽化・変態。規律パラメータ更新。`, 0, prev.uid);
+      }
+
+      const updated: CaterpillarData = {
+        ...prev,
+        points: newPoints,
+        exp: newExp,
+        name: stageInfo.name,
+        stage: newStageIdx,
+        discoveredStages: newDiscovered,
+        logs: [{ time: timeStr, text: logText }, ...prev.logs.slice(0, 19)]
+      };
+
+      appendLogToGas(prev.gasWebAppUrl, 'TRAINING', logText, expGained, prev.uid);
+      triggerGasSync(updated);
+      return updated;
+    });
+  }, [triggerGasSync]);
+
+  // Shop purchase: Furniture
+  const handleBuyFurniture = useCallback((item: FurnitureItem) => {
+    if (data.furniture.includes(item.id)) return;
+    if (data.points < item.price) {
+      setClerkQuote(`「お客様、資金（ポイント）が不足しております。現在の保有ポイントは ${data.points}pt、必要額は ${item.price}pt です。訓練シミュレータにて規律ポイントを補填してください。」`);
+      return;
+    }
+
+    const clerkPhrases = [
+      `「『${item.name}』のご注文を承認しました。領収書を保管し、ケージ内への物理配置プロトコルを即時実行します。」`,
+      `「毎度ありがとうございます。『${item.name}』の検品完了。狂いなき規律空間の拡充を祈念いたします。」`,
+      `「極めて合理的な設備投資です。『${item.name}』による規律向上効果を期待しております。」`
+    ];
+    const quote = clerkPhrases[Math.floor(Math.random() * clerkPhrases.length)];
+    setClerkQuote(quote);
+
+    setData(prev => {
+      const updated: CaterpillarData = {
+        ...prev,
+        points: prev.points - item.price,
+        furniture: [...prev.furniture, item.id],
+        logs: [
+          { time: new Date().toLocaleTimeString(), text: `設備「${item.name}」を購入・設置 (-${item.price}pt)` },
+          ...prev.logs.slice(0, 19)
+        ]
+      };
+      appendLogToGas(prev.gasWebAppUrl, 'SHOP', `設備「${item.name}」を購入`, 0, prev.uid);
+      triggerGasSync(updated);
+      return updated;
+    });
+  }, [data.furniture, data.points, triggerGasSync]);
+
+  // Shop purchase: Spray (80pt)
+  const handleBuySpray = useCallback(() => {
+    const cost = 80;
+    if (data.points < cost) {
+      setClerkQuote(`「スプレーの購入資金が不足しています。必要ポイントは ${cost}pt です。」`);
+      return;
+    }
+
+    setClerkQuote('「『防虫・規律スプレー』を1個補充しました。侵入者やダーリンちゃんを即座に撃退できます。」');
+    setData(prev => {
+      const currentCount = prev.sprayCount || 0;
+      const updated: CaterpillarData = {
+        ...prev,
+        points: prev.points - cost,
+        sprayCount: currentCount + 1,
+        logs: [
+          { time: new Date().toLocaleTimeString(), text: `防虫・規律スプレーを購入 (所持数: ${currentCount + 1}回)` },
+          ...prev.logs.slice(0, 19)
+        ]
+      };
+      appendLogToGas(prev.gasWebAppUrl, 'SHOP', '防虫スプレーを購入', 0, prev.uid);
+      triggerGasSync(updated);
+      return updated;
+    });
+  }, [data.points, triggerGasSync]);
+
+  // Shop purchase: Daycare (50pt for 24h protection)
+  const handleBuyDaycare = useCallback(() => {
+    const cost = 50;
+    if (data.points < cost) {
+      setClerkQuote(`「保育園預かりパスの購入資金が不足しています。必要ポイントは ${cost}pt です。」`);
+      return;
+    }
+
+    const next24h = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    setClerkQuote('「『芋虫保育園 24時間パス』を発行しました。期間中は放置してもダーリンちゃんに乗っ取られません。」');
+    setData(prev => {
+      const updated: CaterpillarData = {
+        ...prev,
+        points: prev.points - cost,
+        daycareUntil: next24h,
+        logs: [
+          { time: new Date().toLocaleTimeString(), text: '芋虫保育園（24時間保護パス）を購入' },
+          ...prev.logs.slice(0, 19)
+        ]
+      };
+      appendLogToGas(prev.gasWebAppUrl, 'SHOP', '保育園パスを購入', 0, prev.uid);
+      triggerGasSync(updated);
+      return updated;
+    });
+  }, [data.points, triggerGasSync]);
+
+  // Use spray handler
+  const handleUseSpray = useCallback(() => {
+    setData(prev => ({
+      ...prev,
+      sprayCount: Math.max(0, (prev.sprayCount || 1) - 1)
+    }));
+  }, []);
+
+  // Resolve Darling-chan incident handler
+  const handleResolveDarlingIncident = useCallback((success: boolean) => {
+    setData(prev => {
+      if (success) {
+        // Restored successfully!
+        const updated: CaterpillarData = {
+          ...prev,
+          darlingIncident: false,
+          lastFedAt: new Date().toISOString(),
+          logs: [
+            { time: new Date().toLocaleTimeString(), text: '✨【救出成功】ILIダーリンちゃんの機嫌を推測し、元の芋虫を取り戻した！' },
+            ...prev.logs.slice(0, 19)
+          ]
+        };
+        appendLogToGas(prev.gasWebAppUrl, 'RECOVERY', 'ダーリンちゃんから芋虫救出成功', 0, prev.uid);
+        triggerGasSync(updated);
+        return updated;
+      } else {
+        // Reset to Lv1
+        const stage0 = STAGES[0];
+        const updated: CaterpillarData = {
+          ...prev,
+          darlingIncident: false,
+          exp: 0,
+          stage: 0,
+          name: stage0.name,
+          lastFedAt: new Date().toISOString(),
+          logs: [
+            { time: new Date().toLocaleTimeString(), text: '🔄【再起動】救出を断念し、Stage 0 (Lv1) から芋虫を育て直すことにした。' },
+            ...prev.logs.slice(0, 19)
+          ]
+        };
+        appendLogToGas(prev.gasWebAppUrl, 'RESET', 'ダーリンちゃん救出断念によりLv1初期化', 0, prev.uid);
+        triggerGasSync(updated);
+        return updated;
+      }
+    });
+  }, [triggerGasSync]);
+
+  // Trigger Darling Test
+  const handleTestDarlingTrigger = () => {
+    setData(prev => ({
+      ...prev,
+      darlingIncident: true,
+      darlingMoodTarget: Math.floor(Math.random() * 100) + 1
+    }));
+  };
+
+  // Chat Submission
+  const handleSendChat = async () => {
+    if (!inputText.trim() || isChatting) return;
+    const text = inputText.trim();
+    setInputText('');
+    
+    const newMsgs = [...chatMessages, { role: 'user' as const, text }];
+    setChatMessages(newMsgs);
+    setIsChatting(true);
+
+    try {
+      appendChatToGas(data.gasWebAppUrl, data.ownerName || '飼育員', text, data.uid);
+      
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          stageName: data.name,
+          stage: data.stage,
+          exp: data.exp,
+          ownerName: data.ownerName,
+          selfType: data.selfType,
+          furniture: data.furniture
+        })
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        const reply = json.reply || 'モゾ……論理構造を再検証中。';
+        setChatMessages(m => [...m, { role: 'lsi', text: reply, provider: json.provider }]);
+        appendChatToGas(data.gasWebAppUrl, data.name, reply, data.uid);
+      } else {
+        setChatMessages(m => [...m, { role: 'lsi', text: 'モゾ……通信規約に一時的な例外を検知。論理回路を保護した。' }]);
+      }
+    } catch {
+      setChatMessages(m => [...m, { role: 'lsi', text: 'モゾ……通信回線が不安定だ。境界線内に待機せよ。' }]);
+    } finally {
+      setIsChatting(false);
+    }
+  };
+
+  // Share text generation
+  const getShareText = () => {
+    return `🐛【LSI芋虫観察日記】\n現在の形態: ${data.name}\n規律EXP: ${data.exp} | 保有コイン: ${data.points}pt\n飼育員: ${data.ownerName} (${data.selfType})\n#LSI芋虫 #ソシオニクス #MBTI`;
+  };
+
+  const handleShareTwitter = () => {
+    const text = encodeURIComponent(getShareText());
+    const url = encodeURIComponent(window.location.href);
+    window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, '_blank');
+  };
+
+  const handleCopyShare = () => {
+    navigator.clipboard.writeText(getShareText());
+    setCopiedShare(true);
+    setTimeout(() => setCopiedShare(false), 2500);
+  };
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-stone-100 flex items-center justify-center p-4">
+        <div className="text-sm font-black text-stone-600 animate-pulse">
+          🧪 統制プロトコル起動中……
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-stone-100 text-stone-900 flex flex-col items-center justify-start p-3 sm:p-5">
+      
+      {/* Outer Constrained Container */}
+      <div className="w-full max-w-4xl flex flex-col gap-4">
+
+        {/* Top App Header */}
+        <header className="bg-white border-2 border-stone-300 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+          
+          {/* Logo & Subtitle */}
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-xl bg-emerald-800 text-white flex items-center justify-center text-2xl shadow-xs">
+                🐛
+              </div>
+              <div>
+                <h1 className="text-base sm:text-lg font-black tracking-tight text-emerald-950 flex items-center gap-2">
+                  <span>LSI芋虫育成シミュレーター</span>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                    Ti-Se / 1F
+                  </span>
+                </h1>
+                <p className="text-[11px] text-stone-500 font-medium">
+                  規律と境界線を愛する不器用な論理芋虫の飼育・観察記録
+                </p>
+              </div>
+            </div>
+
+            {/* Help Button (Mobile) */}
+            <button
+              onClick={() => setIsHelpModalOpen(true)}
+              className="sm:hidden p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100"
+              title="遊び方"
+            >
+              <HelpCircle className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* User Auth & Actions */}
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            
+            {/* How to play Button (Desktop) */}
+            <button
+              onClick={() => setIsHelpModalOpen(true)}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 text-xs font-bold transition shadow-xs cursor-pointer"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+              <span>📖 遊び方</span>
+            </button>
+
+            {/* Encyclopedia Button (Desktop) */}
+            <button
+              onClick={() => setIsEncyclopediaOpen(true)}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-800 text-xs font-bold transition shadow-xs cursor-pointer"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>形態図鑑 ({data.discoveredStages?.length || 1}/{STAGES.length})</span>
+            </button>
+
+            {/* Settings Button */}
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-700 transition cursor-pointer"
+              title="GAS・飼育員設定"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+
+            {/* Google Account Button */}
+            {currentUser ? (
+              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 pl-2.5 pr-1.5 py-1 rounded-xl">
+                <span className="text-xs font-black text-emerald-900 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>{currentUser.displayName || data.ownerName}</span>
+                </span>
+                <button
+                  onClick={handleGoogleLogout}
+                  className="p-1 text-stone-400 hover:text-red-600 transition cursor-pointer"
+                  title="ログアウト"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleGoogleLogin}
+                className="bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition shadow-xs cursor-pointer active:scale-95"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Google同期</span>
+              </button>
+            )}
+
+            {/* Share Button */}
+            <button
+              onClick={() => setIsShareModalOpen(true)}
+              className="bg-stone-800 hover:bg-stone-700 text-white p-2 rounded-xl transition shadow-xs cursor-pointer"
+              title="観察記録を共有"
+            >
+              <Share2 className="w-4 h-4" />
+            </button>
+
+          </div>
+        </header>
+
+        {/* Global Navigation Tabs */}
+        <nav className="grid grid-cols-5 gap-1 sm:gap-2 bg-stone-200/80 p-1.5 rounded-2xl border border-stone-300">
+          {[
+            { id: 'status', label: 'ステータス', icon: Bug },
+            { id: 'observation', label: 'リアル観察', icon: Eye },
+            { id: 'shop', label: '購買部', icon: Store },
+            { id: 'training', label: '規律訓練', icon: Gamepad2 },
+            { id: 'chat', label: '対話監査', icon: Send }
+          ].map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`py-2 px-1 sm:px-3 rounded-xl font-black text-xs sm:text-sm flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 transition-all cursor-pointer ${
+                  isActive 
+                    ? 'bg-white text-emerald-900 shadow-sm border border-stone-200 scale-[1.02]' 
+                    : 'text-stone-600 hover:text-stone-900 hover:bg-white/40'
+                }`}
+              >
+                <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-700' : 'text-stone-500'}`} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* -------------------------------------------------------------
+            TAB 1: STATUS & FEEDING
+        ------------------------------------------------------------- */}
+        {activeTab === 'status' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            
+            {/* Left Col: Interactive Room Cage */}
+            <div className="lg:col-span-2 bg-white border-2 border-stone-300 rounded-2xl p-4 shadow-xs flex flex-col min-h-[440px]">
+              <CaterpillarRoom 
+                onFeed={handleFeed} 
+                stage={data.stage} 
+                ownedFurniture={data.furniture}
+                onSquashLevelDown={handleSquashLevelDown}
+                sprayCount={data.sprayCount || 0}
+                onUseSpray={handleUseSpray}
+                isDarlingIncident={data.darlingIncident}
+                darlingMoodTarget={data.darlingMoodTarget}
+                onResolveDarlingIncident={handleResolveDarlingIncident}
+              />
+            </div>
+
+            {/* Right Col: Stats & Growth Progress */}
+            <div className="flex flex-col gap-3.5">
+              
+              {/* Profile Card */}
+              <div className="bg-white border-2 border-stone-300 rounded-2xl p-4 shadow-xs flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                    {currentStage.badge}
+                  </span>
+                  <div className="flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-lg border border-amber-200">
+                    <Coins className="w-3.5 h-3.5 text-amber-500" />
+                    <span>{data.points} TP</span>
+                  </div>
+                </div>
+
+                <div>
+                  <h2 className="text-lg font-black text-stone-900 flex items-center gap-1.5">
+                    <span>{currentStage.visual}</span>
+                    <span>{currentStage.name}</span>
+                  </h2>
+                  <p className="text-xs text-stone-500 font-medium mt-1 leading-relaxed">
+                    {currentStage.desc}
+                  </p>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="flex flex-col gap-1.5 mt-1 bg-stone-50 p-3 rounded-xl border border-stone-200">
+                  <div className="flex justify-between items-center text-xs font-black">
+                    <span className="text-stone-500">規律EXP</span>
+                    <span className="text-emerald-800">
+                      {data.exp} {nextStage ? `/ ${nextStage.threshold}` : '(MAX)'}
+                    </span>
+                  </div>
+                  <div className="w-full bg-stone-200 rounded-full h-2.5 overflow-hidden">
+                    <div 
+                      className="bg-emerald-600 h-full rounded-full transition-all duration-500"
+                      style={{ 
+                        width: nextStage 
+                          ? `${Math.min(100, (data.exp / nextStage.threshold) * 100)}%` 
+                          : '100%' 
+                      }}
+                    />
+                  </div>
+                  {nextStage && (
+                    <span className="text-[10px] text-stone-400 text-right">
+                      次段階「{nextStage.name}」まで あと {Math.max(0, nextStage.threshold - data.exp)} EXP
+                    </span>
+                  )}
+                </div>
+
+                {/* Daycare & Spray Badges */}
+                <div className="flex flex-wrap gap-1.5 text-[11px] font-bold">
+                  {data.sprayCount ? (
+                    <span className="bg-sky-50 text-sky-800 border border-sky-200 px-2 py-1 rounded-lg flex items-center gap-1">
+                      <Wind className="w-3.5 h-3.5 text-sky-600" />
+                      <span>スプレー: {data.sprayCount}回</span>
+                    </span>
+                  ) : null}
+
+                  {data.daycareUntil && new Date(data.daycareUntil).getTime() > Date.now() ? (
+                    <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-1 rounded-lg flex items-center gap-1">
+                      <Home className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>保育園保護中（24h）</span>
+                    </span>
+                  ) : null}
+                </div>
+
+                {/* Flavor Quote */}
+                <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-2.5 text-xs text-emerald-900 font-medium italic">
+                  {currentStage.flavorQuote}
+                </div>
+
+                {/* Owner info */}
+                <div className="pt-2 border-t border-stone-200 flex justify-between items-center text-xs text-stone-500">
+                  <span>飼育員: <strong className="text-stone-800">{data.ownerName}</strong> ({data.selfType})</span>
+                  <button
+                    onClick={() => {
+                      setTempName(data.ownerName);
+                      setTempType(data.selfType);
+                      setIsProfileModalOpen(true);
+                    }}
+                    className="text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Edit3 className="w-3 h-3" />
+                    <span>変更</span>
+                  </button>
+                </div>
+
+                {/* Test Darling Incident Trigger Button */}
+                <div className="pt-2 border-t border-stone-200 flex items-center justify-between">
+                  <button
+                    onClick={handleTestDarlingTrigger}
+                    className="text-[11px] bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition active:scale-95"
+                    title="3日放置インシデントの演出をテスト起動します"
+                  >
+                    <AlertTriangle className="w-3 h-3 text-rose-500" />
+                    <span>🧪 ダーリンちゃん襲来テスト</span>
+                  </button>
+                  <span className="text-[10px] text-stone-400">動作検証用</span>
+                </div>
+
+              </div>
+
+              {/* Activity Log */}
+              <div className="bg-white border-2 border-stone-300 rounded-2xl p-4 shadow-xs flex-1 flex flex-col">
+                <h3 className="text-xs font-black text-stone-700 flex items-center gap-1.5 mb-2">
+                  <Clock className="w-3.5 h-3.5 text-stone-500" />
+                  <span>規律監査ログ（直近）</span>
+                </h3>
+                <div className="flex-1 overflow-y-auto max-h-[160px] flex flex-col gap-1.5 pr-1 text-xs">
+                  {data.logs.map((log, i) => (
+                    <div key={i} className="text-stone-600 bg-stone-50 p-2 rounded-lg border border-stone-100 leading-snug">
+                      <span className="font-mono text-[10px] text-stone-400 mr-1.5">[{log.time}]</span>
+                      <span>{log.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        )}
+
+        {/* -------------------------------------------------------------
+            TAB 2: OBSERVATION MODE
+        ------------------------------------------------------------- */}
+        {activeTab === 'observation' && (
+          <div className="bg-white border-2 border-stone-300 rounded-2xl p-4 shadow-xs flex flex-col gap-4">
+            <div className="flex items-center justify-between bg-stone-50 p-3.5 rounded-xl border border-stone-200">
+              <div className="flex items-center gap-2">
+                <Eye className="w-5 h-5 text-emerald-800" />
+                <div>
+                  <h3 className="text-sm font-black text-stone-800">24時間リアルタイム規律観察カメラ</h3>
+                  <p className="text-xs text-stone-500">
+                    現在の時間帯プロトコルに完全連動した芋虫の生態行動をモニタリング中
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-full animate-pulse">
+                ● LIVE REC
+              </span>
+            </div>
+
+            <div className="min-h-[460px] w-full flex flex-col">
+              <CaterpillarRoom 
+                onFeed={handleFeed} 
+                stage={data.stage} 
+                ownedFurniture={data.furniture}
+                observationMode={true}
+                onSquashLevelDown={handleSquashLevelDown}
+                sprayCount={data.sprayCount || 0}
+                onUseSpray={handleUseSpray}
+                isDarlingIncident={data.darlingIncident}
+                darlingMoodTarget={data.darlingMoodTarget}
+                onResolveDarlingIncident={handleResolveDarlingIncident}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* -------------------------------------------------------------
+            TAB 3: SHOP
+        ------------------------------------------------------------- */}
+        {activeTab === 'shop' && (
+          <div className="bg-white border-2 border-stone-300 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col gap-5">
+            
+            {/* Clerk Box */}
+            <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4">
+              <div className="relative w-16 h-16 rounded-full bg-emerald-200 border-2 border-emerald-500 flex items-center justify-center shrink-0 shadow-md overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img 
+                  src="/images/staff.png" 
+                  alt="店員" 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    // Fallback to cute avatar if image doesn't exist
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.parentElement?.querySelector('.staff-fallback');
+                    if (fallback) fallback.classList.remove('hidden');
+                  }}
+                />
+                <span className="staff-fallback hidden text-3xl">🧑‍💼</span>
+              </div>
+
+              <div className="flex-1 text-center sm:text-left">
+                <span className="text-[10px] font-black bg-emerald-800 text-white px-2 py-0.5 rounded">
+                  購買部 規律相談窓口
+                </span>
+                <p className="text-xs sm:text-sm font-bold text-stone-800 mt-1 leading-relaxed">
+                  {clerkQuote}
+                </p>
+              </div>
+
+              <div className="bg-white border border-emerald-300 px-3.5 py-2 rounded-xl text-center shrink-0 shadow-xs">
+                <span className="text-[10px] font-bold text-stone-400 block">所持ポイント</span>
+                <span className="text-base font-black text-amber-600 flex items-center justify-center gap-1">
+                  <Coins className="w-4 h-4 text-amber-500" />
+                  <span>{data.points} TP</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Defensive & Consumable Items */}
+            <div className="flex flex-col gap-2.5">
+              <h3 className="text-xs font-black text-stone-700 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-sky-600" />
+                <span>防衛・デイケア特需品</span>
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Item 1: Spray */}
+                <div className="bg-sky-50/60 border-2 border-sky-200 rounded-2xl p-4 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-sky-100 border border-sky-300 flex items-center justify-center text-3xl">
+                      💨
+                    </div>
+                    <div>
+                      <h4 className="font-black text-sm text-stone-900">防虫・規律スプレー</h4>
+                      <p className="text-[11px] text-stone-500 font-medium mt-0.5">
+                        ご褒美・ダーリンちゃんをシュッと即座に撃退！ (所持: {data.sprayCount || 0}回)
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleBuySpray}
+                    className="bg-sky-600 hover:bg-sky-500 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs transition active:scale-95 shrink-0 cursor-pointer"
+                  >
+                    80 TP
+                  </button>
+                </div>
+
+                {/* Item 2: Daycare */}
+                <div className="bg-emerald-50/60 border-2 border-emerald-200 rounded-2xl p-4 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-100 border border-emerald-300 flex items-center justify-center text-3xl">
+                      🏡
+                    </div>
+                    <div>
+                      <h4 className="font-black text-sm text-stone-900">芋虫保育園 24hパス</h4>
+                      <p className="text-[11px] text-stone-500 font-medium mt-0.5">
+                        放置しても安心！ 24時間ダーリンちゃんの乗っ取りを防ぐ
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleBuyDaycare}
+                    className="bg-emerald-700 hover:bg-emerald-600 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs transition active:scale-95 shrink-0 cursor-pointer"
+                  >
+                    50 TP
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Furniture Grid */}
+            <div className="flex flex-col gap-2.5">
+              <h3 className="text-xs font-black text-stone-700 flex items-center gap-1.5">
+                <Store className="w-4 h-4 text-emerald-700" />
+                <span>ケージ内統制設備・家具一覧（全8種）</span>
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {AVAILABLE_FURNITURE.map(item => {
+                  const isOwned = data.furniture.includes(item.id);
+                  return (
+                    <div 
+                      key={item.id}
+                      className={`border-2 rounded-2xl p-4 flex items-center justify-between gap-3 transition-all ${
+                        isOwned 
+                          ? 'bg-stone-50 border-stone-200 opacity-85' 
+                          : 'bg-white border-stone-300 hover:border-emerald-500 shadow-xs'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-stone-100 border border-stone-200 flex items-center justify-center text-3xl shrink-0">
+                          {item.icon}
+                        </div>
+                        <div>
+                          <h4 className="font-black text-sm text-stone-900">{item.name}</h4>
+                          <p className="text-[11px] text-stone-500 font-medium mt-0.5 leading-tight">
+                            {item.desc}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0">
+                        {isOwned ? (
+                          <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1">
+                            <Check className="w-3.5 h-3.5" />
+                            <span>設置済</span>
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleBuyFurniture(item)}
+                            className="bg-emerald-700 hover:bg-emerald-600 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs transition active:scale-95 flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>{item.price} TP</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* -------------------------------------------------------------
+            TAB 4: MINI-GAMES / TRAINING
+        ------------------------------------------------------------- */}
+        {activeTab === 'training' && (
+          <div className="bg-white border-2 border-stone-300 rounded-2xl p-4 shadow-xs">
+            <MiniGames 
+              onReward={handleMiniGameReward}
+              caterpillarStage={data.name}
+            />
+          </div>
+        )}
+
+        {/* -------------------------------------------------------------
+            TAB 5: CHAT / AUDIT
+        ------------------------------------------------------------- */}
+        {activeTab === 'chat' && (
+          <div className="bg-white border-2 border-stone-300 rounded-2xl p-4 shadow-xs flex flex-col gap-3 min-h-[480px]">
+            
+            {/* Chat Header */}
+            <div className="bg-stone-50 border border-stone-200 p-3 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">💬</span>
+                <div>
+                  <h3 className="text-xs font-black text-stone-800">LSI芋虫 論理対話・監査セッション</h3>
+                  <p className="text-[11px] text-stone-500">Gemini 2.5 Flash によるリアルタイム構造化対話</p>
+                </div>
+              </div>
+              <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">
+                Ti-Se 応答モード
+              </span>
+            </div>
+
+            {/* Chat Message List */}
+            <div className="flex-1 overflow-y-auto max-h-[360px] flex flex-col gap-2.5 p-2 bg-stone-50/50 rounded-xl border border-stone-200">
+              {chatMessages.map((msg, i) => {
+                const isUser = msg.role === 'user';
+                return (
+                  <div 
+                    key={i} 
+                    className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
+                  >
+                    <span className="text-[10px] font-bold text-stone-400 mb-0.5 px-1">
+                      {isUser ? (data.ownerName || '飼育員') : data.name}
+                    </span>
+                    <div 
+                      className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-medium leading-relaxed shadow-xs ${
+                        isUser 
+                          ? 'bg-emerald-700 text-white rounded-tr-none' 
+                          : 'bg-white border-2 border-stone-200 text-stone-800 rounded-tl-none'
+                      }`}
+                    >
+                      {msg.text}
+                    </div>
+                  </div>
+                );
+              })}
+              {isChatting && (
+                <div className="self-start bg-white border border-stone-200 rounded-2xl px-4 py-2 text-xs text-stone-400 font-mono animate-pulse">
+                  モゾ……論理構文を解析中……
+                </div>
+              )}
+            </div>
+
+            {/* Chat Input Bar */}
+            <div className="flex gap-2">
+              <input 
+                type="text"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
+                placeholder="LSI芋虫に規律や日常の相談を送信……"
+                className="flex-1 bg-stone-50 border-2 border-stone-300 focus:border-emerald-600 focus:bg-white rounded-xl px-4 py-2 text-xs sm:text-sm text-stone-800 focus:outline-none transition-colors"
+                disabled={isChatting}
+              />
+              <button
+                onClick={handleSendChat}
+                disabled={isChatting || !inputText.trim()}
+                className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-xs"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>送信</span>
+              </button>
+            </div>
+
+          </div>
+        )}
+
+      </div>
+
+      {/* -------------------------------------------------------------
+          MODAL: HOW TO PLAY (遊び方)
+      ------------------------------------------------------------- */}
+      <AnimatePresence>
+        {isHelpModalOpen && (
+          <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white border-2 border-stone-300 rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between border-b border-stone-200 pb-3">
+                <h3 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
+                  <HelpCircle className="w-5 h-5 text-emerald-700" />
+                  <span>📖 LSI芋虫 遊び方・規律ガイド</span>
+                </h3>
+                <button 
+                  onClick={() => setIsHelpModalOpen(false)}
+                  className="p-1 rounded-lg text-stone-400 hover:text-stone-700 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-4 text-xs sm:text-sm text-stone-700 leading-relaxed">
+                
+                {/* Section 1: Rearing */}
+                <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl">
+                  <h4 className="font-black text-emerald-900 flex items-center gap-1.5 mb-1">
+                    <span>1. 🐛 エサやりでEXPを稼いで形態進化！</span>
+                  </h4>
+                  <p className="text-xs text-stone-600">
+                    ケージ内をクリック（タップ）してエサを投下。芋虫が食べてEXPが上昇し、<strong>さなぎ（繭/水晶/成熟蛹）を経て完全統制蝶🦋</strong>へ羽化します！
+                  </p>
+                </div>
+
+                {/* Section 2: Mini-games */}
+                <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl">
+                  <h4 className="font-black text-amber-900 flex items-center gap-1.5 mb-1">
+                    <span>2. 🧠 ミニゲームで大量コイン（TP）を稼ぐ！</span>
+                  </h4>
+                  <p className="text-xs text-stone-600">
+                    「規律訓練」タブで4つのミニゲーム（物理反射・概念仕分け・不器用Fe対話・芋虫もぐら叩き）に挑戦！ ハイスコアで大量のTP（購買部用コイン）を獲得できます。
+                  </p>
+                </div>
+
+                {/* Section 3: Shop & Spray */}
+                <div className="bg-sky-50 border border-sky-200 p-3.5 rounded-2xl">
+                  <h4 className="font-black text-sky-900 flex items-center gap-1.5 mb-1">
+                    <span>3. 🛒 購買部で家具＆防衛アイテムを購入！</span>
+                  </h4>
+                  <p className="text-xs text-stone-600">
+                    ケージにレザーソファや精密定規を配置！ さらに「防虫スプレー」や「保育園パス」を買っておくと、放置時のトラブルを未然に防ぐことができます。
+                  </p>
+                </div>
+
+                {/* Section 4: Neglect Incident */}
+                <div className="bg-rose-50 border border-rose-200 p-3.5 rounded-2xl">
+                  <h4 className="font-black text-rose-900 flex items-center gap-1.5 mb-1">
+                    <span>4. 🚨 3日放置の危機とダーリンちゃん救出！</span>
+                  </h4>
+                  <p className="text-xs text-stone-600">
+                    丸3日お世話をサボると、ILIダーリンちゃん（🥺）がケージを占拠！ 1〜100の機嫌当てゲームに正解するかスプレーを使って、元の芋虫を取り戻しましょう。
+                  </p>
+                </div>
+
+                {/* Section 5: 30 Taps Squash */}
+                <div className="bg-stone-100 border border-stone-200 p-3.5 rounded-2xl">
+                  <h4 className="font-black text-stone-800 flex items-center gap-1.5 mb-1">
+                    <span>5. 💥 30回タップ圧殺と立体復旧</span>
+                  </h4>
+                  <p className="text-xs text-stone-600">
+                    芋虫を30回過剰タップするとペシャンコに完全平面化し、EXPが低下します。「構造再定義」ボタンを押して3次元立体を復旧しましょう！
+                  </p>
+                </div>
+
+              </div>
+
+              <button
+                onClick={() => setIsHelpModalOpen(false)}
+                className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-xl transition text-xs cursor-pointer shadow-xs"
+              >
+                理解した（閉じる）
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* -------------------------------------------------------------
+          MODAL: ENCYCLOPEDIA (形態図鑑)
+      ------------------------------------------------------------- */}
+      <AnimatePresence>
+        {isEncyclopediaOpen && (
+          <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white border-2 border-stone-300 rounded-3xl p-5 sm:p-6 max-w-xl w-full shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between border-b border-stone-200 pb-3">
+                <h3 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 text-emerald-700" />
+                  <span>📖 LSI芋虫 形態進化図鑑（Stage 0〜5）</span>
+                </h3>
+                <button 
+                  onClick={() => setIsEncyclopediaOpen(false)}
+                  className="p-1 rounded-lg text-stone-400 hover:text-stone-700 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                {STAGES.map((s, idx) => {
+                  const isDiscovered = data.discoveredStages?.includes(s.name) || data.exp >= s.threshold;
+                  const isCurrent = data.stage === idx;
+
+                  return (
+                    <div 
+                      key={s.name}
+                      className={`p-4 rounded-2xl border-2 transition-all ${
+                        isCurrent
+                          ? 'bg-emerald-50/80 border-emerald-500 shadow-md ring-2 ring-emerald-400/40'
+                          : isDiscovered 
+                          ? 'bg-white border-stone-200 shadow-xs' 
+                          : 'bg-stone-100/70 border-dashed border-stone-300 opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-xl bg-stone-100 border border-stone-200 flex items-center justify-center text-3xl shrink-0">
+                            {isDiscovered ? s.visual : '❓'}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-black bg-stone-800 text-white px-2 py-0.2 rounded">
+                                {s.badge}
+                              </span>
+                              {isCurrent && (
+                                <span className="text-[10px] font-black bg-emerald-600 text-white px-2 py-0.2 rounded">
+                                  現在形態
+                                </span>
+                              )}
+                            </div>
+                            <h4 className="font-black text-sm text-stone-900 mt-0.5">
+                              {isDiscovered ? s.name : '？？？（未解放形態）'}
+                            </h4>
+                          </div>
+                        </div>
+
+                        <span className="text-xs font-black text-stone-500 shrink-0">
+                          必要EXP: {s.threshold}
+                        </span>
+                      </div>
+
+                      {isDiscovered ? (
+                        <div className="mt-2.5 pt-2.5 border-t border-stone-100 flex flex-col gap-1 text-xs">
+                          <p className="text-stone-600 font-medium">{s.desc}</p>
+                          <p className="text-emerald-800 font-bold text-[11px] mt-0.5">{s.disciplineTitle}</p>
+                          <p className="text-stone-500 italic text-[11px]">“{s.flavorQuote}”</p>
+                        </div>
+                      ) : (
+                        <div className="mt-2 text-xs text-stone-400 font-medium">
+                          🔒 解放条件: 規律EXP {s.threshold} 以上（ヒント: {s.hint}）
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => setIsEncyclopediaOpen(false)}
+                className="w-full bg-stone-800 hover:bg-stone-700 text-white font-bold py-2.5 rounded-xl transition text-xs cursor-pointer shadow-xs"
+              >
+                閉じる
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* -------------------------------------------------------------
+          MODAL: PROFILE EDIT
+      ------------------------------------------------------------- */}
+      <AnimatePresence>
+        {isProfileModalOpen && (
+          <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white border-2 border-stone-300 rounded-3xl p-6 max-w-sm w-full shadow-2xl flex flex-col gap-4"
+            >
+              <h3 className="text-base font-black text-stone-900">飼育員プロファイルの編集</h3>
+              
+              <div className="flex flex-col gap-3 text-xs">
+                <div>
+                  <label className="font-bold text-stone-600 mb-1 block">飼育員名（呼び名）</label>
+                  <input
+                    type="text"
+                    value={tempName}
+                    onChange={(e) => setTempName(e.target.value)}
+                    className="w-full bg-stone-50 border-2 border-stone-300 rounded-xl px-3 py-2 text-stone-900 font-bold focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-stone-600 mb-1 block">性格タイプ（MBTI / ソシオ）</label>
+                  <input
+                    type="text"
+                    value={tempType}
+                    onChange={(e) => setTempType(e.target.value)}
+                    placeholder="例: EIE, INFJ, 4w3 など"
+                    className="w-full bg-stone-50 border-2 border-stone-300 rounded-xl px-3 py-2 text-stone-900 font-bold focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => setIsProfileModalOpen(false)}
+                  className="flex-1 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold py-2 rounded-xl text-xs cursor-pointer"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={() => {
+                    setData(prev => ({
+                      ...prev,
+                      ownerName: tempName.trim() || '飼育員',
+                      selfType: tempType.trim() || '未設定'
+                    }));
+                    setIsProfileModalOpen(false);
+                  }}
+                  className="flex-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2 rounded-xl text-xs cursor-pointer shadow-xs"
+                >
+                  保存する
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* -------------------------------------------------------------
+          MODAL: SETTINGS & GAS SYNC
+      ------------------------------------------------------------- */}
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white border-2 border-stone-300 rounded-3xl p-6 max-w-md w-full shadow-2xl flex flex-col gap-4"
+            >
+              <div className="flex items-center justify-between border-b border-stone-200 pb-3">
+                <h3 className="text-base font-black text-stone-900 flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-stone-700" />
+                  <span>GAS同期 & 飼育設定</span>
+                </h3>
+                <button 
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="p-1 rounded-lg text-stone-400 hover:text-stone-700 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-3 text-xs">
+                <div className="bg-stone-50 border border-stone-200 p-3 rounded-xl">
+                  <label className="font-bold text-stone-700 block mb-1">GAS WebアプリURL</label>
+                  <p className="text-[11px] text-stone-500 mb-2 font-mono break-all">
+                    {data.gasWebAppUrl || DEFAULT_GAS_URL}
+                  </p>
+                  <button
+                    onClick={() => triggerGasSync(data)}
+                    disabled={syncStatus === 'syncing'}
+                    className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer shadow-xs"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+                    <span>{syncStatus === 'syncing' ? '同期中……' : '今すぐGASと完全同期'}</span>
+                  </button>
+                  {syncStatus === 'synced' && (
+                    <p className="text-[11px] text-emerald-600 font-bold mt-1 text-center">
+                      ✓ スプレッドシート同期に成功しました！
+                    </p>
+                  )}
+                </div>
+
+                <div className="bg-stone-50 border border-stone-200 p-3 rounded-xl">
+                  <h4 className="font-bold text-stone-700 mb-1">画像アセット管理</h4>
+                  <p className="text-[11px] text-stone-500 leading-relaxed">
+                    店員画像は <code className="bg-stone-200 px-1 py-0.5 rounded text-stone-800 font-mono">/public/images/staff.png</code> を自動読み込みします。
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsSettingsOpen(false)}
+                className="w-full bg-stone-800 hover:bg-stone-700 text-white font-bold py-2.5 rounded-xl transition text-xs cursor-pointer shadow-xs"
+              >
+                閉じる
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* -------------------------------------------------------------
+          MODAL: SHARE
+      ------------------------------------------------------------- */}
+      <AnimatePresence>
+        {isShareModalOpen && (
+          <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white border-2 border-stone-300 rounded-3xl p-6 max-w-sm w-full shadow-2xl flex flex-col gap-4 text-center"
+            >
+              <h3 className="text-base font-black text-stone-900">観察日記を共有</h3>
+              
+              <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3.5 text-xs text-stone-700 text-left font-mono whitespace-pre-wrap leading-relaxed shadow-inner">
+                {getShareText()}
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={handleShareTwitter}
+                  className="flex-1 bg-sky-500 hover:bg-sky-600 text-white font-bold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>X (Twitter)</span>
+                </button>
+                <button
+                  onClick={handleCopyShare}
+                  className="flex-1 bg-stone-100 hover:bg-stone-200 border border-stone-300 text-stone-800 font-bold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  {copiedShare ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Share2 className="w-3.5 h-3.5" />}
+                  <span>{copiedShare ? 'コピー完了' : '本文コピー'}</span>
+                </button>
+              </div>
+
+              <button
+                onClick={() => setIsShareModalOpen(false)}
+                className="text-xs text-stone-400 hover:text-stone-600 cursor-pointer"
+              >
+                閉じる
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* -------------------------------------------------------------
+          MODAL: EVOLUTION CELEBRATION
+      ------------------------------------------------------------- */}
+      <AnimatePresence>
+        {evolutionNotice && (
+          <div className="fixed inset-0 z-50 bg-stone-900/70 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              className="bg-white border-3 border-emerald-500 rounded-3xl p-6 max-w-sm w-full shadow-2xl flex flex-col items-center text-center gap-3"
+            >
+              <div className="w-16 h-16 rounded-full bg-emerald-100 border-2 border-emerald-500 flex items-center justify-center text-4xl shadow-md animate-bounce">
+                {evolutionNotice.visual}
+              </div>
+
+              <div>
+                <span className="text-[10px] font-black bg-emerald-800 text-white px-2 py-0.5 rounded">
+                  {evolutionNotice.badge} 達成
+                </span>
+                <h3 className="text-lg font-black text-stone-900 mt-1">
+                  「{evolutionNotice.name}」へ羽化・変態！
+                </h3>
+              </div>
+
+              <p className="text-xs text-stone-600 leading-relaxed bg-stone-50 p-3 rounded-xl border border-stone-200">
+                {evolutionNotice.desc}
+              </p>
+
+              <p className="text-xs font-bold text-emerald-900 italic">
+                {evolutionNotice.flavorQuote}
+              </p>
+
+              <button
+                onClick={() => setEvolutionNotice(null)}
+                className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-xl transition text-xs shadow-xs cursor-pointer active:scale-95 mt-1"
+              >
+                規律を継続する
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+    </div>
+  );
+}
