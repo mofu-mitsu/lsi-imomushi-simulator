@@ -30,7 +30,23 @@ export interface CaterpillarData {
   evolutionBranch?: string;
 }
 
-export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxkTSIew8Z9k5KqfDt4s_TqcfneQ7XilCLR-FWZSVWhZmk2Qzx5LASMmTKBzll5u0caiQ/exec';
+export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbx0-G96uGOO0skbmWJANpjC6HTQ1JbWeazlv0XWn7ClADaJfSriMYmMOEY5Eyw3udRgXQ/exec';
+
+// Generate or retrieve unique guest UID per browser/device
+export function getOrCreateGuestUid(): string {
+  if (typeof window === 'undefined') return 'guest_default';
+  try {
+    const existing = localStorage.getItem('lsi_caterpillar_guest_uid');
+    if (existing && existing.startsWith('guest_')) return existing;
+    
+    // Create random unique guest id: guest_TIMESTAMP_RANDOM
+    const newUid = 'guest_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
+    localStorage.setItem('lsi_caterpillar_guest_uid', newUid);
+    return newUid;
+  } catch {
+    return 'guest_' + Date.now().toString(36);
+  }
+}
 
 export const DEFAULT_CATERPILLAR_DATA: CaterpillarData = {
   ownerName: '未設定',
@@ -75,10 +91,12 @@ export async function loadFromGas(
     return { success: false, error: '有効なGAS WebアプリURLがありません' };
   }
 
+  const targetUid = uid || getOrCreateGuestUid();
+
   try {
     const url = new URL(targetUrl);
     url.searchParams.set('action', 'getUserStatus');
-    if (uid) url.searchParams.set('uid', uid);
+    url.searchParams.set('uid', targetUid);
 
     const res = await fetch(url.toString(), {
       method: 'GET'
@@ -109,6 +127,8 @@ export async function syncWithGas(
     return { success: false, error: '有効なGAS WebアプリURLがありません' };
   }
 
+  const targetUid = data.uid || getOrCreateGuestUid();
+
   try {
     const res = await fetch(targetUrl, {
       method: 'POST',
@@ -129,7 +149,7 @@ export async function syncWithGas(
           discoveredStages: data.discoveredStages || ['LSI芋虫（幼虫）'],
           lastFedAt: data.lastFedAt,
           lastMessageAt: data.lastMessageAt,
-          uid: data.uid || '',
+          uid: targetUid,
           sprayCount: data.sprayCount || 0,
           daycareUntil: data.daycareUntil || null,
           darlingIncident: data.darlingIncident || false,
@@ -172,7 +192,7 @@ export async function appendLogToGas(
         type,
         detail,
         expChange,
-        uid: uid || 'guest'
+        uid: uid || getOrCreateGuestUid()
       })
     });
   } catch (e) {
@@ -197,7 +217,7 @@ export async function appendChatToGas(
         action: 'appendChat',
         sender,
         message,
-        uid: uid || 'guest'
+        uid: uid || getOrCreateGuestUid()
       })
     });
   } catch (e) {

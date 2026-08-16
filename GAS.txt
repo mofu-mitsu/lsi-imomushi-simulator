@@ -1,18 +1,20 @@
 /**
  * 🐛 LSI芋虫 育成・統制シミュレーター用 Google Apps Script (GAS)
  * 
- * 【Googleアカウント毎の個別データ保存・復元対応版】
+ * 【Googleアカウント別 & ゲスト個別データ完全保存・アイテム復元対応版 (v3)】
  * 
  * 【導入手順】
  * 1. お手持ちの Google スプレッドシート を開きます。
  * 2. 上部メニューの「拡張機能」 > 「Apps Script」を開きます。
- * 3. エディタ内のコードをすべて削除し、このファイルの内容を貼り付けて保存（Ctrl+S / Cmd+S）します。
+ * 3. エディタ内のコードをすべて削除し、このファイルの内容をすべて貼り付けて保存（Ctrl+S / Cmd+S）します。
  * 4. 画面右上の「デプロイ」 > 「新しいデプロイ」をクリックします。
  * 5. 種類を「ウェブアプリ」にし、以下を設定します：
  *    - 次のユーザーとして実行: 「自分」
  *    - アクセスできるユーザー: 「全員」
  * 6. 「デプロイ」を押して表示された「ウェブアプリ URL」をコピーし、
- *    LSI芋虫アプリの「GAS URL設定」に入力すれば連携完了です！
+ *    LSI芋虫アプリに入力するか、DEFAULT_GAS_URLに設定すれば連携完了です！
+ * 
+ * ※ 既に古いシートが存在する場合でも、自動で新しい列定義に合わせてアップグレードされます。
  */
 
 function doGet(e) {
@@ -30,55 +32,29 @@ function doGet(e) {
       }
       
       const data = sheet.getDataRange().getValues();
-      // Look for row matching UID
+      
+      // Look for row matching requested UID
       if (uid && data.length > 1) {
         for (let i = 1; i < data.length; i++) {
           if (String(data[i][0]) === String(uid)) {
-            const userObj = {
-              uid: data[i][0],
-              ownerName: data[i][1],
-              selfType: data[i][2],
-              id: data[i][3],
-              name: data[i][4],
-              stage: Number(data[i][5]) || 0,
-              exp: Number(data[i][6]) || 0,
-              points: Number(data[i][7]) || 0,
-              furniture: data[i][8] ? JSON.parse(data[i][8]) : [],
-              discoveredStages: data[i][9] ? JSON.parse(data[i][9]) : [],
-              lastFedAt: data[i][10],
-              lastMessageAt: data[i][11]
-            };
+            const userObj = parseRowToUserObject(data[i]);
             return createJsonResponse({ success: true, data: userObj });
           }
         }
       }
       
-      // Fallback: If not found or no UID, return the first entry or empty
+      // If UID not found or not provided, return the first entry if available
       if (data.length > 1) {
-        const first = data[1];
         return createJsonResponse({ 
           success: true, 
-          data: {
-            uid: first[0],
-            ownerName: first[1],
-            selfType: first[2],
-            id: first[3],
-            name: first[4],
-            stage: Number(first[5]) || 0,
-            exp: Number(first[6]) || 0,
-            points: Number(first[7]) || 0,
-            furniture: first[8] ? JSON.parse(first[8]) : [],
-            discoveredStages: first[9] ? JSON.parse(first[9]) : [],
-            lastFedAt: first[10],
-            lastMessageAt: first[11]
-          }
+          data: parseRowToUserObject(data[1])
         });
       }
       
       return createJsonResponse({ success: true, data: null });
     }
     
-    return createJsonResponse({ success: true, message: 'LSI Caterpillar GAS Backend is running.' });
+    return createJsonResponse({ success: true, message: 'LSI Caterpillar GAS Backend (v3) is running.' });
   } catch (error) {
     return createJsonResponse({ success: false, error: error.toString() });
   }
@@ -101,7 +77,7 @@ function doPost(e) {
       const values = sheet.getDataRange().getValues();
       let targetRowIndex = -1;
       
-      // Check existing UID
+      // Check existing UID row
       for (let i = 1; i < values.length; i++) {
         if (String(values[i][0]) === targetUid) {
           targetRowIndex = i + 1;
@@ -110,26 +86,32 @@ function doPost(e) {
       }
       
       const rowData = [
-        targetUid,
-        data.ownerName || '未設定',
-        data.selfType || '未設定',
-        data.id || '000001',
-        data.name || 'LSI芋虫',
-        data.stage !== undefined ? data.stage : 0,
-        data.exp !== undefined ? data.exp : 0,
-        data.points !== undefined ? data.points : 0,
-        JSON.stringify(data.furniture || []),
-        JSON.stringify(data.discoveredStages || []),
-        data.lastFedAt || nowStr,
-        data.lastMessageAt || nowStr,
-        nowStr
+        targetUid,                                            // 1: UID
+        data.ownerName || '未設定',                           // 2: 飼育員名
+        data.selfType || '未設定',                            // 3: 自認タイプ
+        data.id || '000001',                                 // 4: 個体ID
+        data.name || 'LSI芋虫',                              // 5: 名前・肩書
+        data.stage !== undefined ? data.stage : 0,           // 6: 進化段階
+        data.exp !== undefined ? data.exp : 0,               // 7: 獲得EXP
+        data.points !== undefined ? data.points : 0,         // 8: 統制ポイント
+        JSON.stringify(data.furniture || []),                // 9: 所有家具
+        JSON.stringify(data.discoveredStages || []),         // 10: アンロック図鑑
+        data.sprayCount !== undefined ? data.sprayCount : 0, // 11: 防虫スプレー所持数
+        data.daycareUntil || '',                             // 12: 保育園保護期限
+        JSON.stringify(data.foodStats || { cabbage: 0, apple: 0, glucose: 0, sugar: 0, twig: 0 }), // 13: エサ摂取統計
+        data.formVariant || 'crystal',                       // 14: 形態バリアント
+        data.darlingIncident ? true : false,                 // 15: ダーリンインシデント
+        data.squashCount !== undefined ? data.squashCount : 0, // 16: 潰された回数
+        data.lastFedAt || nowStr,                            // 17: 最終給餌日時
+        data.lastMessageAt || nowStr,                        // 18: 最終交信日時
+        nowStr                                               // 19: 最終更新日時
       ];
       
       if (targetRowIndex > 0) {
         // Update existing row
         sheet.getRange(targetRowIndex, 1, 1, rowData.length).setValues([rowData]);
       } else {
-        // Append new row for this user
+        // Append new row for this user / guest
         sheet.appendRow(rowData);
       }
       
@@ -165,27 +147,73 @@ function doPost(e) {
   }
 }
 
+function parseRowToUserObject(row) {
+  return {
+    uid: row[0],
+    ownerName: row[1],
+    selfType: row[2],
+    id: row[3],
+    name: row[4],
+    stage: Number(row[5]) || 0,
+    exp: Number(row[6]) || 0,
+    points: Number(row[7]) || 0,
+    furniture: safeJsonParse(row[8], []),
+    discoveredStages: safeJsonParse(row[9], ['LSI芋虫（幼虫）']),
+    sprayCount: Number(row[10]) || 0,
+    daycareUntil: row[11] || null,
+    foodStats: safeJsonParse(row[12], { cabbage: 0, apple: 0, glucose: 0, sugar: 0, twig: 0 }),
+    formVariant: row[13] || 'crystal',
+    darlingIncident: row[14] === true || String(row[14]) === 'true',
+    squashCount: Number(row[15]) || 0,
+    lastFedAt: row[16] || '',
+    lastMessageAt: row[17] || ''
+  };
+}
+
+function safeJsonParse(str, fallback) {
+  if (!str) return fallback;
+  try {
+    return JSON.parse(str);
+  } catch (e) {
+    return fallback;
+  }
+}
+
 function initSheetsIfNeeded(ss) {
+  const headers = [
+    'UID (アカウント識別子)', 
+    '飼育員名', 
+    '自認タイプ', 
+    '個体ID', 
+    '名前・肩書', 
+    '進化段階', 
+    '獲得EXP', 
+    '統制ポイント', 
+    '所有家具 (JSON)', 
+    'アンロック図鑑 (JSON)',
+    '防虫スプレー回数',
+    '保育園保護期限',
+    'エサ摂取統計 (JSON)',
+    '形態バリアント',
+    'ダーリンインシデント',
+    '潰された回数',
+    '最終給餌日時', 
+    '最終交信日時', 
+    '最終更新日時'
+  ];
+
   let statusSheet = ss.getSheetByName('個体ステータス_アカウント別');
   if (!statusSheet) {
     statusSheet = ss.insertSheet('個体ステータス_アカウント別');
-    const headers = [
-      'UID (アカウント識別子)', 
-      '飼育員名', 
-      '自認タイプ', 
-      '個体ID', 
-      '名前・肩書', 
-      '進化段階', 
-      '獲得EXP', 
-      '統制ポイント', 
-      '所有家具', 
-      'アンロック図鑑',
-      '最終給餌日時', 
-      '最終交信日時', 
-      '最終更新日時'
-    ];
     statusSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     statusSheet.getRange(1, 1, 1, headers.length).setBackground('#d1fae5').setFontWeight('bold');
+  } else {
+    // Check if headers need updating to new 19 columns
+    const currentCols = statusSheet.getLastColumn();
+    if (currentCols < headers.length) {
+      statusSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      statusSheet.getRange(1, 1, 1, headers.length).setBackground('#d1fae5').setFontWeight('bold');
+    }
   }
   
   let logSheet = ss.getSheetByName('行動ログ');

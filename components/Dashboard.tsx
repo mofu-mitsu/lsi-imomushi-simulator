@@ -44,7 +44,8 @@ import {
   loadFromGas,
   syncWithGas, 
   appendLogToGas, 
-  appendChatToGas 
+  appendChatToGas,
+  getOrCreateGuestUid
 } from '@/lib/google-sheets';
 import { auth, googleAuthProvider } from '@/lib/firebase';
 import { signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
@@ -339,12 +340,25 @@ export const STAGES = ALL_ENCYCLOPEDIA_STAGES;
 
 export const CLERK_QUOTES = [
   '「いらっしゃいませ。アイテムの購入におけるコストパフォーマンスと要因分解をお手伝いします。」',
-  '「……閲覧のみですか。空間の占有率に対して購買行動が発生しない内部要因を分析してもいいですか？」',
   '「いらっしゃいませ。当店の商品は全てJIS規格およびLSI統制基準を満たしております。規律ある設備投資をご検討ください。」',
-  '「冷やかしですか？ 購買意思決定プロセスのボトルネックを特定しましょうか。」',
   '「無計画な消費はエントロピーを増大させます。必要な設備のみを厳格に調達してください。」',
-  '「防虫スプレーの有効成分は高純度Ti論理結晶です。突発的な感情要求を物理的にシャットアウトします。」'
+  '「防虫スプレーの有効成分は高純度Ti論理結晶です。突発的な感情要求を物理的にシャットアウトします。」',
+  '「当店の商品はすべて空間占有率と心理的安定度の相関関係を検証済みです。」',
+  '「購入前に『利用規約第88条（設備の減価償却）』をご一読いただくことを推奨します。」'
 ];
+
+export const getClerkInsufficientFundsQuote = (itemName: string, cost: number, currentPoints: number): string => {
+  const diff = Math.max(0, cost - currentPoints);
+  const quotes = [
+    `「『${itemName}』の購入資金が不足しています。必要ポイントは ${cost}pt（不足: ${diff}pt）です。」`,
+    `「お客様、資金（ポイント）が不足しております。現在の保有ポイントは ${currentPoints}pt、必要額は ${cost}pt です。訓練シミュレータにて規律ポイントを補填してください。」`,
+    '「冷やかしですか？ 購買意思決定プロセスのボトルネックを特定しましょうか。」',
+    '「……閲覧のみですか。空間の占有率に対して購買行動が発生しない内部要因を分析してもいいですか？」',
+    `「『${itemName}』への投資判断は妥当ですが、残高（${currentPoints}pt）が調達コスト（${cost}pt）を満たしていません。」`,
+    '「予算超過を検知。感情的な衝動買いを防止するため、まずは訓練による自己規律の向上を命じます。」'
+  ];
+  return quotes[Math.floor(Math.random() * quotes.length)];
+};
 
 const LOCAL_STORAGE_KEY = 'lsi_caterpillar_data_v8';
 
@@ -397,6 +411,7 @@ export default function Dashboard() {
   const [data, setData] = useState<CaterpillarData>(() => {
     if (typeof window !== 'undefined') {
       try {
+        const guestUid = getOrCreateGuestUid();
         const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
@@ -411,6 +426,7 @@ export default function Dashboard() {
             stage: stageIdx,
             formVariant: formVariant,
             gasWebAppUrl: DEFAULT_GAS_URL,
+            uid: parsed.uid || guestUid,
             points: parsed.points !== undefined ? parsed.points : 150,
             furniture: parsed.furniture || [],
             discoveredStages: discovered,
@@ -421,6 +437,10 @@ export default function Dashboard() {
             foodStats: parsed.foodStats || { cabbage: 0, apple: 0, glucose: 0, sugar: 0, twig: 0 }
           };
         }
+        return {
+          ...DEFAULT_CATERPILLAR_DATA,
+          uid: guestUid
+        };
       } catch (e) {
         console.error('Failed to load initial storage:', e);
       }
@@ -443,7 +463,14 @@ export default function Dashboard() {
     if (!mounted) return;
     const timeoutId = setTimeout(() => {
       const now = Date.now();
-      const lastActivity = new Date(data.lastFedAt || data.lastMessageAt || 0).getTime();
+      const lastActivityRaw = data.lastFedAt || data.lastMessageAt;
+      
+      // If never fed or no valid activity timestamp recorded yet, don't trigger incident
+      if (!lastActivityRaw) return;
+      
+      const lastActivity = new Date(lastActivityRaw).getTime();
+      if (isNaN(lastActivity) || lastActivity <= 0) return;
+
       const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
 
       // Check if daycare is currently active or sleep time
@@ -456,12 +483,12 @@ export default function Dashboard() {
           darlingIncident: true,
           darlingMoodTarget: (Math.floor(Math.random() * 990) + 10) / 10,
           logs: [
-            { time: new Date().toLocaleTimeString(), text: '🚨【物理崩壊インシデント】3日間放置されたため、ILIダーリンちゃんにケージを占拠された！' },
+            { time: new Date().toLocaleTimeString(), text: '🚨【物理崩壊インシデント】放置されたため、ILIダーリンちゃんにケージを占拠された！' },
             ...prev.logs.slice(0, 19)
           ]
         }));
       }
-    }, 100);
+    }, 500);
 
     return () => clearTimeout(timeoutId);
   }, [mounted, data.lastFedAt, data.lastMessageAt, data.daycareUntil, data.darlingIncident]);
@@ -477,8 +504,8 @@ export default function Dashboard() {
           if (res.success && res.data) {
             const fetched = res.data;
             const exp = typeof fetched.exp === 'number' ? fetched.exp : 0;
-            const stageIdx = STAGES.reduce((acc, stage, idx) => exp >= stage.threshold ? idx : acc, 0);
-            const stageInfo = STAGES[stageIdx];
+            const foodStats = fetched.foodStats || { cabbage: 0, apple: 0, glucose: 0, sugar: 0, twig: 0 };
+            const { stageInfo, stageIdx, formVariant } = getFormStageInfo(exp, foodStats);
             const discovered = Array.from(new Set([...(fetched.discoveredStages || []), stageInfo.name]));
 
             setData(prev => ({
@@ -486,10 +513,17 @@ export default function Dashboard() {
               ...fetched,
               name: stageInfo.name,
               stage: stageIdx,
+              formVariant: fetched.formVariant || formVariant,
               discoveredStages: discovered,
               uid: user.uid,
               ownerName: fetched.ownerName || (user.displayName || '飼育員'),
-              gasWebAppUrl: DEFAULT_GAS_URL
+              gasWebAppUrl: DEFAULT_GAS_URL,
+              sprayCount: fetched.sprayCount !== undefined ? fetched.sprayCount : (prev.sprayCount || 0),
+              daycareUntil: fetched.daycareUntil !== undefined ? fetched.daycareUntil : prev.daycareUntil,
+              darlingIncident: fetched.darlingIncident !== undefined ? fetched.darlingIncident : prev.darlingIncident,
+              darlingMoodTarget: fetched.darlingMoodTarget || prev.darlingMoodTarget,
+              foodStats: foodStats,
+              squashCount: fetched.squashCount !== undefined ? fetched.squashCount : (prev.squashCount || 0)
             }));
             setSyncStatus('synced');
           } else {
@@ -740,7 +774,7 @@ export default function Dashboard() {
   const handleBuyFurniture = useCallback((item: FurnitureItem) => {
     if (data.furniture.includes(item.id)) return;
     if (data.points < item.price) {
-      setClerkQuote(`「お客様、資金（ポイント）が不足しております。現在の保有ポイントは ${data.points}pt、必要額は ${item.price}pt です。訓練シミュレータにて規律ポイントを補填してください。」`);
+      setClerkQuote(getClerkInsufficientFundsQuote(item.name, item.price, data.points));
       return;
     }
 
@@ -772,7 +806,7 @@ export default function Dashboard() {
   const handleBuySpray = useCallback(() => {
     const cost = 80;
     if (data.points < cost) {
-      setClerkQuote(`「スプレーの購入資金が不足しています。必要ポイントは ${cost}pt です。」`);
+      setClerkQuote(getClerkInsufficientFundsQuote('防虫・規律スプレー', cost, data.points));
       return;
     }
 
@@ -798,7 +832,7 @@ export default function Dashboard() {
   const handleBuyDaycare = useCallback(() => {
     const cost = 50;
     if (data.points < cost) {
-      setClerkQuote(`「保育園預かりパスの購入資金が不足しています。必要ポイントは ${cost}pt です。」`);
+      setClerkQuote(getClerkInsufficientFundsQuote('芋虫保育園 24時間パス', cost, data.points));
       return;
     }
 
@@ -1725,10 +1759,10 @@ export default function Dashboard() {
                 {/* Section 4: Neglect Incident */}
                 <div className="bg-rose-50 border border-rose-200 p-3.5 rounded-2xl">
                   <h4 className="font-black text-rose-900 flex items-center gap-1.5 mb-1">
-                    <span>4. 🚨 3日放置の危機とダーリンちゃん救出！</span>
+                    <span>4. 🚨 放置の危機とダーリンちゃん救出！</span>
                   </h4>
                   <p className="text-xs text-stone-600">
-                    丸3日お世話をサボると、ILIダーリンちゃん（🥺）がケージを占拠！ 1〜100の機嫌当てゲームに正解するかスプレーを使って、元の芋虫を取り戻しましょう。
+                    お世話をサボると、ILIダーリンちゃん（🥺）がケージを占拠！ 1〜100の機嫌当てゲームに正解して、元の芋虫を取り戻しましょう。
                   </p>
                 </div>
 

@@ -1058,28 +1058,49 @@ export default function CaterpillarRoom({
 
             {/* Caterpillar / Cocoon Body */}
             <motion.div 
-              className="inline-block transition-transform select-none origin-bottom"
-              style={{ 
-                transform: isSquashed 
-                  ? 'scaleY(0.05) scaleX(2.7) rotate(6deg) skewX(22deg)' 
-                  : `scaleX(${facingRight ? -1 : 1})`,
-                filter: isSquashed ? 'brightness(0.85) saturate(1.3) drop-shadow(0 2px 2px rgba(0,0,0,0.5))' : undefined
+              className="inline-block select-none origin-bottom relative"
+              animate={
+                isSquashed
+                  ? {
+                      scaleY: 0.08,
+                      scaleX: (facingRight ? -1 : 1) * 2.8,
+                      y: 18,
+                      rotate: 4,
+                      filter: 'brightness(0.8) saturate(1.4) drop-shadow(0 2px 4px rgba(0,0,0,0.6))'
+                    }
+                  : {
+                      scaleY: Math.max(0.35, 1 - (squashHits / 30) * 0.65),
+                      scaleX: (facingRight ? -1 : 1) * (1 + (squashHits / 30) * 0.8),
+                      y: !isSleepingNow && (catTarget || foods.length > 0) ? [-2, 0, -2] : 0,
+                      rotate: !isSleepingNow && (catTarget || foods.length > 0) ? [-3, 3, -3] : 0,
+                      filter: squashHits > 0 ? 'brightness(0.9) saturate(1.2)' : 'none'
+                    }
+              }
+              transition={{
+                scaleY: { type: 'spring', stiffness: 450, damping: 25 },
+                scaleX: { type: 'spring', stiffness: 450, damping: 25 },
+                rotate: { repeat: !isSquashed && (catTarget || foods.length > 0) ? Infinity : 0, duration: 0.5 },
+                y: { repeat: !isSquashed && (catTarget || foods.length > 0) ? Infinity : 0, duration: 0.5 }
               }}
-              animate={!isSquashed && !isSleepingNow ? { 
-                rotate: catTarget || foods.length > 0 ? [-3, 3, -3] : 0,
-                y: catTarget || foods.length > 0 ? [-2, 0, -2] : 0
-              } : {}}
-              transition={{ repeat: Infinity, duration: 0.5 }}
             >
-              <div className="relative select-none filter drop-shadow-md flex items-center justify-center">
+              {/* Floor squash shadow */}
+              {isSquashed && (
+                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-28 h-4 bg-emerald-950/40 rounded-full blur-xs pointer-events-none -z-10" />
+              )}
+
+              <div className="relative select-none flex items-center justify-center">
                 {stage === 4 ? (
-                  <ChrysalisSVG variant={formVariant} size={68} />
+                  <div className="inline-block">
+                    <ChrysalisSVG variant={formVariant} size={68} />
+                  </div>
                 ) : (
-                  <span className="text-6xl">{getStageEmoji()}</span>
+                  <span className="text-6xl inline-block select-none leading-none transform origin-bottom">
+                    {getStageEmoji()}
+                  </span>
                 )}
                 {isSquashed && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <span className="text-[10px] bg-red-600 text-white font-black px-2 py-0.5 rounded-full shadow-md animate-pulse whitespace-nowrap">
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50">
+                    <span className="text-[10px] bg-red-600 text-white font-black px-2 py-0.5 rounded-full shadow-md animate-pulse whitespace-nowrap scale-y-[12.5] scale-x-[0.35]">
                       💥 完全平面化
                     </span>
                   </div>
@@ -1100,7 +1121,7 @@ export default function CaterpillarRoom({
             
             <div className="bg-red-600 text-white text-xs font-black px-3 py-1 rounded-full animate-bounce shadow-md flex items-center gap-1.5 mb-2">
               <AlertTriangle className="w-4 h-4" />
-              <span>🚨【警告】3日放置による物理崩壊インシデント発生！</span>
+              <span>🚨【警告】放置による物理崩壊インシデント発生！</span>
             </div>
 
             {/* Darling Visual */}
