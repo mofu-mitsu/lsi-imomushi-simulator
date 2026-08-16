@@ -1078,7 +1078,7 @@ export default function Dashboard() {
                   ? 'bg-rose-50 border-rose-300 text-rose-800'
                   : 'bg-white hover:bg-stone-50 border-stone-300 text-stone-800'
               }`}
-              title={lastSavedTime ? `最終保存: ${lastSavedTime}` : 'Googleスプレッドシート & ブラウザに手動保存'}
+              title={lastSavedTime ? `最終保存: ${lastSavedTime}` : 'ブラウザに手動保存'}
             >
               {syncStatus === 'syncing' ? (
                 <>
@@ -2093,7 +2093,7 @@ export default function Dashboard() {
                     <div className="flex flex-col">
                       <span>💾 今すぐセーブ（手動保存）</span>
                       <span className="text-[10px] text-stone-500 font-normal">
-                        {lastSavedTime ? `最終: ${lastSavedTime}` : 'Googleスプレッドシート & ブラウザに保存'}
+                        {lastSavedTime ? `最終: ${lastSavedTime}` : 'ブラウザに保存'}
                       </span>
                     </div>
                   </button>
