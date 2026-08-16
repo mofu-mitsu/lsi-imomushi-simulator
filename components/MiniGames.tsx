@@ -1320,7 +1320,7 @@ export default function MiniGames({
                 <h3 className="font-black text-sm text-stone-800">4. 物理連打バフ（Se/1F）</h3>
                 <p className="text-xs font-bold text-amber-700 mt-0.5">「芋虫もぐら叩き」</p>
                 <p className="text-[11px] text-stone-500 font-medium mt-2 leading-relaxed">
-                  穴から顔を出す芋虫をタップ連打！ 断末魔とTiデータがブシャーッと弾け飛ぶ！ ダーリンちゃんの阿波弁ブチギレ罠に注意！
+                  穴から顔を出す芋虫をタップ連打！ 断末魔とTiデータがブシャーッと弾け飛ぶ！ ダーリンちゃんのブチギレ罠に注意！
                 </p>
               </div>
               <button
