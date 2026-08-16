@@ -30,7 +30,7 @@ export interface CaterpillarData {
   evolutionBranch?: string;
 }
 
-export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbx0-G96uGOO0skbmWJANpjC6HTQ1JbWeazlv0XWn7ClADaJfSriMYmMOEY5Eyw3udRgXQ/exec';
+export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzPnjoctGcPVTVKrOy3cVgv2k9GAVUBFbebApzU3ymj3_I_FmEP3r989jMtcpfumL9rSg/exec';
 
 // Generate or retrieve unique guest UID per browser/device
 export function getOrCreateGuestUid(): string {

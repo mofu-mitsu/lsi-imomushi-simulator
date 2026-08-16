@@ -43,14 +43,7 @@ function doGet(e) {
         }
       }
       
-      // If UID not found or not provided, return the first entry if available
-      if (data.length > 1) {
-        return createJsonResponse({ 
-          success: true, 
-          data: parseRowToUserObject(data[1])
-        });
-      }
-      
+      // If UID not found, return null so the frontend knows it's a new user
       return createJsonResponse({ success: true, data: null });
     }
     
