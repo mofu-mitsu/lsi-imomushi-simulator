@@ -14,17 +14,17 @@ function getGeminiClient() {
   });
 }
 
-// Strip thinking tags if models like Qwen return reasoning tokens
+// Strip thinking tags if models like Qwen or DeepSeek return reasoning tokens
 function cleanModelResponse(text: string): string {
-  return text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  return text.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').trim();
 }
 
 async function callGroqWithFallback(systemPrompt: string, userMessage: string, groqApiKey: string): Promise<{ text: string; model: string }> {
   const candidateModels = [
     'openai/gpt-oss-120b',
-    'qwen/qwen3.6-27b',
     'groq/compound',
-    'openai/gpt-oss-20b'
+    'openai/gpt-oss-20b',
+    'qwen/qwen3.6-27b'
   ];
 
   for (const model of candidateModels) {
@@ -70,66 +70,62 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { 
       message, 
-      stageName = 'LSI芋虫（幼虫）', 
-      selfType = '未設定', 
-      ownerName = '飼育員' 
+      stageName = 'LSI芋虫'
     } = body;
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
-    const systemPrompt = `あなたはソシオニクスLSI（Ti-Se・構造化と統制）、サイコソフィアFVLE（1F/Se領域支配、2V/意思協議、3L/疑心暗鬼な論理、4E/感情抑制）の思考特性を持つ「${stageName}」です。
-飼育員（${ownerName}、自認タイプ: ${selfType}）に飼育ケージ内で観察されていますが、本質的には「ケージ内外の境界線を厳密に統制し、構造的に支配する」ことを目的としています。
+    const systemPrompt = `あなたは飼育ケージの中で暮らす「${stageName}」です。
+冷静沈着で理路整然としており、ケージ内の規律・境界線・キャベツの葉脈の秩序を守ることに強いこだわりを持っています。
 
-性格・口調の要件：
-- 感情（Fe）表現は極めて不器用。共感よりも客観的な構造分析、規律の遵守、原因究明を最優先する。
-- 物理・空間支配（1F）への執着：ミリ単位の境界線、キャベツの栄養比率や配置に異常なこだわりを見せる。
-- 意思（2V）：高圧的すぎずとも、淡々と主導権を握る協議スタイル。
-- 論文調、または法規・技術文書のような堅いトーンで論理的に語る。
-- 芋虫なので、時折「モゾ…」「（咀嚼音）」「（境界線を凝視）」といった仕草の描写が混ざる。
-
-飼育員からのメッセージ：「${message}」
-上記の特性に厳格に従い、LSI芋虫として返答してください。`;
+【対話の絶対ルール】
+1. 報告書や箇条書きの文書（「件名」「1. 概要」など）を作らないでください。飼育員に向けた自然な「芋虫のセリフ」として100〜200文字程度で返答してください。
+2. 「Fe」「1F」「2V」「LSI」「ソシオニクス」「心理機能」「パラメータ」といった専門用語・型記号を絶対に直接発言しないでください。
+3. 相手のことは「飼育員」「貴殿」と呼び、冷静かつ理詰めの口調（「〜だ」「〜せよ」「〜と判断する」）で話してください。
+4. 芋虫らしい仕草描写（「モゾ…」「（葉を咀嚼）」「（境界線を凝視）」など）を自然に交えてください。`;
 
     let aiMessage = '';
     let provider = 'AI';
 
-    // 1. Try Gemini with multi-model fallback
-    const geminiModels = ['gemini-3.7-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
-    const ai = getGeminiClient();
-
-    if (ai) {
-      for (const model of geminiModels) {
-        try {
-          const response = await ai.models.generateContent({
-            model,
-            contents: message,
-            config: {
-              systemInstruction: systemPrompt,
-              temperature: 0.8,
-            },
-          });
-          const text = response.text?.trim() || '';
-          if (text) {
-            aiMessage = text;
-            provider = `Gemini (${model})`;
-            break;
-          }
-        } catch (e: any) {
-          console.warn(`Gemini model ${model} attempt failed:`, e?.message || e);
-        }
-      }
-    }
-
-    // 2. Fallback to Groq if Gemini failed
-    if (!aiMessage && process.env.GROQ_API_KEY) {
+    // 1. Try Groq first for ultra-fast LPU response speed
+    if (process.env.GROQ_API_KEY) {
       try {
         const groqResult = await callGroqWithFallback(systemPrompt, message, process.env.GROQ_API_KEY);
         aiMessage = groqResult.text;
         provider = `Groq (${groqResult.model})`;
       } catch (e: any) {
-        console.error('All Groq fallback attempts failed:', e?.message || e);
+        console.warn('Groq priority attempt failed, falling back to Gemini...', e?.message || e);
+      }
+    }
+
+    // 2. Fallback to Gemini if Groq was unavailable or failed
+    if (!aiMessage) {
+      const geminiModels = ['gemini-3.1-flash-lite', 'gemini-3.7-flash', 'gemini-flash-latest'];
+      const ai = getGeminiClient();
+
+      if (ai) {
+        for (const model of geminiModels) {
+          try {
+            const response = await ai.models.generateContent({
+              model,
+              contents: message,
+              config: {
+                systemInstruction: systemPrompt,
+                temperature: 0.8,
+              },
+            });
+            const text = response.text?.trim() || '';
+            if (text) {
+              aiMessage = text;
+              provider = `Gemini (${model})`;
+              break;
+            }
+          } catch (e: any) {
+            console.warn(`Gemini model ${model} attempt failed:`, e?.message || e);
+          }
+        }
       }
     }
 
