@@ -1,33 +1,68 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-async function callGroqLlama(systemPrompt: string, userMessage: string, groqApiKey: string): Promise<string> {
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${groqApiKey}`,
-      'Content-Type': 'application/json',
+function getGeminiClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  return new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
     },
-    body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage }
-      ],
-      temperature: 0.7,
-      max_tokens: 600,
-    }),
   });
+}
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Groq API failed: ${res.status} ${errText}`);
+// Strip thinking tags if models like Qwen return reasoning tokens
+function cleanModelResponse(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+}
+
+async function callGroqWithFallback(systemPrompt: string, userMessage: string, groqApiKey: string): Promise<{ text: string; model: string }> {
+  const candidateModels = [
+    'openai/gpt-oss-120b',
+    'qwen/qwen3.6-27b',
+    'groq/compound',
+    'openai/gpt-oss-20b'
+  ];
+
+  for (const model of candidateModels) {
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${groqApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage }
+          ],
+          temperature: 0.7,
+          max_tokens: 600,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const rawContent = data.choices?.[0]?.message?.content || '';
+        const cleaned = cleanModelResponse(rawContent);
+        if (cleaned) {
+          return { text: cleaned, model };
+        }
+      } else {
+        const errText = await res.text();
+        console.warn(`Groq model ${model} failed with status ${res.status}:`, errText);
+      }
+    } catch (e: any) {
+      console.warn(`Groq model ${model} error:`, e?.message || e);
+    }
   }
 
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content || '……（Llama-3.3-70B応答生成完了）';
+  throw new Error('All Groq candidate models failed');
 }
 
 export async function POST(req: NextRequest) {
@@ -58,33 +93,49 @@ export async function POST(req: NextRequest) {
 上記の特性に厳格に従い、LSI芋虫として返答してください。`;
 
     let aiMessage = '';
-    let provider = 'Gemini';
+    let provider = 'AI';
 
-    // 1. Try Gemini
-    try {
-      if (process.env.GEMINI_API_KEY) {
-        const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: systemPrompt,
-        });
-        aiMessage = response.text || '';
+    // 1. Try Gemini with multi-model fallback
+    const geminiModels = ['gemini-3.7-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+    const ai = getGeminiClient();
+
+    if (ai) {
+      for (const model of geminiModels) {
+        try {
+          const response = await ai.models.generateContent({
+            model,
+            contents: message,
+            config: {
+              systemInstruction: systemPrompt,
+              temperature: 0.8,
+            },
+          });
+          const text = response.text?.trim() || '';
+          if (text) {
+            aiMessage = text;
+            provider = `Gemini (${model})`;
+            break;
+          }
+        } catch (e: any) {
+          console.warn(`Gemini model ${model} attempt failed:`, e?.message || e);
+        }
       }
-    } catch (e: any) {
-      console.warn('Gemini attempt failed, checking fallback Groq Llama-3.3-70B...', e);
     }
 
-    // 2. Fallback to Groq Llama-3.3-70B if Gemini failed or returned empty
+    // 2. Fallback to Groq if Gemini failed
     if (!aiMessage && process.env.GROQ_API_KEY) {
       try {
-        aiMessage = await callGroqLlama(systemPrompt, message, process.env.GROQ_API_KEY);
-        provider = 'Groq (llama-3.3-70b-versatile)';
-      } catch (e) {
-        console.error('Groq Llama-3.3-70B fallback failed:', e);
+        const groqResult = await callGroqWithFallback(systemPrompt, message, process.env.GROQ_API_KEY);
+        aiMessage = groqResult.text;
+        provider = `Groq (${groqResult.model})`;
+      } catch (e: any) {
+        console.error('All Groq fallback attempts failed:', e?.message || e);
       }
     }
 
-    // 3. Fallback mock if both fail
+    // 3. Fallback mock only if both external providers fail
     if (!aiMessage) {
+      provider = 'Local Logic Protocol';
       aiMessage = `モゾ…【緊急解析プロトコル起動】
 貴殿の発言「${message}」に含まれる論理構造を検知した。
 現在、外部通信プロセッサの負荷が境界線を超過しているため、ローカル論理ユニットにより応答する。

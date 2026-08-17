@@ -10,9 +10,16 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const ai = new GoogleGenAI({ 
+      apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
     const response = await ai.models.generateContent({
-      model: model || "gemini-2.5-flash",
+      model: model || "gemini-3.7-flash",
       contents: prompt,
     });
     return NextResponse.json({ text: response.text || "" });
