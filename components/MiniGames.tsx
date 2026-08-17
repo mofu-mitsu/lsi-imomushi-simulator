@@ -1159,7 +1159,7 @@ export default function MiniGames({
 
   // Balanced Rewards: Lots of Points (Coins), Small amount of EXP so caterpillar doesn't level up too quickly!
   const handleGameFinish = (mode: string, score: number, ptMultiplier = 15, expMultiplier = 1) => {
-    const expGain = Math.max(1, Math.round(score * expMultiplier));
+    const expGain = 0;
     const ptGain = Math.max(5, score * ptMultiplier);
     setLastGameResult({ mode, score, exp: expGain, points: ptGain });
     setSelectedGameMode('hub');
@@ -1173,7 +1173,7 @@ export default function MiniGames({
 
   const handleShare = async () => {
     if (!lastGameResult) return;
-    const text = `🐛【LSI芋虫 規律訓練シミュレーター】\n『${lastGameResult.mode}』で【スコア ${lastGameResult.score} 点】を達成！\n獲得コイン: +${lastGameResult.points}TP 獲得！\n\n#LSI芋虫 #ソシオニクス #規律訓練`;
+    const text = `🐛【LSI芋虫 規律訓練シミュレーター】\n『${lastGameResult.mode}』で【スコア ${lastGameResult.score} 点】を達成！\n獲得コイン: +${lastGameResult.points}TP\n\n#LSI芋虫 #ソシオニクス #規律訓練`;
     const url = window.location.href;
 
     if (navigator.share) {
@@ -1222,7 +1222,7 @@ export default function MiniGames({
               <div>
                 <span className="text-xs font-black text-emerald-800 bg-emerald-200 px-2 py-0.5 rounded">前回スコア</span>
                 <p className="text-sm font-black text-stone-800 mt-1">
-                  『{lastGameResult.mode}』: <strong>{lastGameResult.score} 点</strong>（+{lastGameResult.exp} EXP, +{lastGameResult.points} TP）
+                  『{lastGameResult.mode}』: <strong>{lastGameResult.score} 点</strong>（+{lastGameResult.points} TP）
                 </p>
               </div>
 

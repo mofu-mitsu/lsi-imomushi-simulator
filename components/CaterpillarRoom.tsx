@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import ChrysalisSVG from './ChrysalisSVG';
+import AdultSVG from './AdultSVG';
 
 type Position = { x: number; y: number };
 type Food = { id: number; pos: Position; type: string; name: string; exp: number };
@@ -395,7 +396,8 @@ export default function CaterpillarRoom({
   onUseSpray,
   isDarlingIncident = false,
   darlingMoodTarget = 50,
-  onResolveDarlingIncident
+  onResolveDarlingIncident,
+  adoptPhase = 0
 }: { 
   onFeed: (exp: number, foodName: string, foodId?: string) => void;
   stage: number;
@@ -412,6 +414,7 @@ export default function CaterpillarRoom({
   isDarlingIncident?: boolean;
   darlingMoodTarget?: number;
   onResolveDarlingIncident?: (success: boolean) => void;
+  adoptPhase?: 0 | 1 | 2 | 3 | 4 | 5;
 }) {
   const [foods, setFoods] = useState<Food[]>([]);
   const [catPos, setCatPos] = useState<Position>({ x: 50, y: 50 });
@@ -462,6 +465,14 @@ export default function CaterpillarRoom({
     }, 10000);
     return () => clearTimeout(timer);
   }, [isSquashed, handleRecover]);
+
+  // Handle Adopt Phase forced movement
+  useEffect(() => {
+    if (adoptPhase === 1 || adoptPhase === 2) {
+      setCatPos({ x: 45, y: 50 });
+      setFacingRight(true);
+    }
+  }, [adoptPhase]);
 
   // Random quotes in observation mode
   useEffect(() => {
@@ -646,13 +657,17 @@ export default function CaterpillarRoom({
     return () => clearInterval(interval);
   }, [catTarget, foods, ownedFurniture, isSquashed, isSleepingNow, isDarlingIncident, ballPos]);
 
-  // Movement loop
+// Movement loop
   useEffect(() => {
     if (isSquashed || isSleepingNow || isDarlingIncident) return;
     const interval = setInterval(() => {
       setCatPos(prev => {
         let target = catTarget;
-        if (foods.length > 0) {
+        
+        // Go towards Tonkotsu soup if placed!
+        if (intruder && intruder.type === 'gohoubi' && intruder.soupPlaced) {
+           target = { x: intruder.x, y: intruder.y };
+        } else if (foods.length > 0) {
           target = foods[0].pos;
         }
 
@@ -1025,6 +1040,34 @@ export default function CaterpillarRoom({
           ))}
         </AnimatePresence>
 
+        {/* Partner Butterfly for Adoption (Stage 5 only) */}
+        {adoptPhase > 0 && adoptPhase < 4 && (
+          <motion.div
+            className="absolute z-50 pointer-events-none"
+            initial={{ left: '120%', top: '30%', opacity: 0 }}
+            animate={
+              adoptPhase === 1 
+                ? { left: '55%', top: '50%', opacity: 1, rotate: [-5, 5, -5] } 
+                : adoptPhase === 2
+                ? { left: '55%', top: '50%', opacity: 1, rotate: [0, -10, 10, 0] }
+                : { top: '-20%', opacity: 0 } // Fly away phase 3
+            }
+            transition={{ duration: adoptPhase === 1 ? 2 : adoptPhase === 2 ? 0.5 : 2, repeat: adoptPhase === 2 ? Infinity : 0 }}
+            style={{ transform: 'translate(-50%, -50%) scaleX(-1)' }}
+          >
+            <AdultSVG variant="morpho" size={76} />
+            {adoptPhase === 2 && (
+              <motion.div 
+                className="absolute -top-10 left-1/2 text-2xl text-pink-500"
+                animate={{ y: [0, -20], opacity: [1, 0] }}
+                transition={{ duration: 1, repeat: Infinity }}
+              >
+                💕
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+
         {/* Normal Caterpillar & Bubble (Hidden during Darling Incident) */}
         {!isDarlingIncident && (
           <div 
@@ -1068,6 +1111,20 @@ export default function CaterpillarRoom({
                       rotate: 4,
                       filter: 'brightness(0.8) saturate(1.4) drop-shadow(0 2px 4px rgba(0,0,0,0.6))'
                     }
+                  : adoptPhase === 3
+                  ? {
+                      y: -300,
+                      opacity: 0,
+                      scale: 0.5,
+                      rotate: facingRight ? -180 : 180
+                    }
+                  : adoptPhase >= 4
+                  ? {
+                      y: 0,
+                      opacity: 1,
+                      scale: 1,
+                      rotate: 0
+                    }
                   : {
                       scaleY: Math.max(0.35, 1 - (squashHits / 30) * 0.65),
                       scaleX: (facingRight ? -1 : 1) * (1 + (squashHits / 30) * 0.8),
@@ -1079,8 +1136,9 @@ export default function CaterpillarRoom({
               transition={{
                 scaleY: { type: 'spring', stiffness: 450, damping: 25 },
                 scaleX: { type: 'spring', stiffness: 450, damping: 25 },
-                rotate: { repeat: !isSquashed && (catTarget || foods.length > 0) ? Infinity : 0, duration: 0.5 },
-                y: { repeat: !isSquashed && (catTarget || foods.length > 0) ? Infinity : 0, duration: 0.5 }
+                rotate: { repeat: !isSquashed && (catTarget || foods.length > 0) && adoptPhase === 0 ? Infinity : 0, duration: 0.5 },
+                y: { repeat: !isSquashed && (catTarget || foods.length > 0) && adoptPhase === 0 ? Infinity : 0, duration: 0.5 },
+                opacity: { duration: 0.8 }
               }}
             >
               {/* Floor squash shadow */}
@@ -1089,7 +1147,26 @@ export default function CaterpillarRoom({
               )}
 
               <div className="relative select-none flex items-center justify-center">
-                {stage === 4 ? (
+                {adoptPhase >= 4 ? (
+                  <motion.span
+                    className="text-6xl inline-block select-none leading-none transform origin-bottom"
+                    initial={{ y: -300 }}
+                    animate={{ y: 0, rotate: adoptPhase === 5 ? [0, -15, 15, -15, 15, 0] : 0, scale: adoptPhase === 5 ? [1, 1.1, 1] : 1 }}
+                    transition={adoptPhase === 5 ? { duration: 0.6, repeat: Infinity, repeatType: "reverse" } : { type: 'spring', bounce: 0.5 }}
+                  >
+                    🥚
+                  </motion.span>
+                ) : stage === 5 ? (
+                  <div className="inline-block" style={{ transform: facingRight ? 'scaleX(-1)' : 'none' }}>
+                    {formVariant === 'emoji' ? (
+                      <span className="text-6xl inline-block select-none leading-none transform origin-bottom">
+                        🦋
+                      </span>
+                    ) : (
+                      <AdultSVG variant={formVariant} size={76} />
+                    )}
+                  </div>
+                ) : stage === 4 ? (
                   <div className="inline-block">
                     <ChrysalisSVG variant={formVariant} size={68} />
                   </div>
