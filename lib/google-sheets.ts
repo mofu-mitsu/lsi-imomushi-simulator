@@ -7,6 +7,7 @@ export interface CaterpillarData {
   exp: number;
   points: number;
   furniture: string[];
+  equippedFurniture?: string[];
   discoveredStages: string[];
   lastFedAt: string;
   lastMessageAt: string;
@@ -30,7 +31,7 @@ export interface CaterpillarData {
   evolutionBranch?: string;
 }
 
-export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzPnjoctGcPVTVKrOy3cVgv2k9GAVUBFbebApzU3ymj3_I_FmEP3r989jMtcpfumL9rSg/exec';
+export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzwLpEzIBRYwqgYdjQBs15oCD41lExD4PVJiA1dNDIWbvF3p7G7Ks8A_dbUwt1BJCiXgg/exec';
 
 // Generate or retrieve unique guest UID per browser/device
 export function getOrCreateGuestUid(): string {
@@ -57,9 +58,10 @@ export const DEFAULT_CATERPILLAR_DATA: CaterpillarData = {
   exp: 0,
   points: 150, // Initial bonus points
   furniture: [],
+  equippedFurniture: [],
   discoveredStages: ['LSI芋虫（幼虫）'],
-  lastFedAt: '2026-08-15T00:00:00.000Z',
-  lastMessageAt: '2026-08-15T00:00:00.000Z',
+  lastFedAt: new Date().toISOString(),
+  lastMessageAt: new Date().toISOString(),
   logs: [
     { time: '09:00:00', text: '領域の境界線をミリ単位で点検・確保。' },
     { time: '08:00:00', text: 'エサの成分表示（タンパク質・脂質比率）を熟読。' }
@@ -146,6 +148,7 @@ export async function syncWithGas(
           exp: data.exp,
           points: data.points,
           furniture: data.furniture,
+          equippedFurniture: data.equippedFurniture || data.furniture,
           discoveredStages: data.discoveredStages || ['LSI芋虫（幼虫）'],
           lastFedAt: data.lastFedAt,
           lastMessageAt: data.lastMessageAt,
@@ -222,5 +225,41 @@ export async function appendChatToGas(
     });
   } catch (e) {
     console.error('Failed to append chat to GAS:', e);
+  }
+}
+
+export interface Announcement {
+  id: string;
+  date: string;
+  title: string;
+  content: string;
+}
+
+export async function fetchAnnouncementsFromGas(gasUrl: string): Promise<{ success: boolean; data?: Announcement[]; error?: string }> {
+  const targetUrl = gasUrl || DEFAULT_GAS_URL;
+  if (!targetUrl || !targetUrl.startsWith('http')) {
+    return { success: false, error: '有効なGAS WebアプリURLがありません' };
+  }
+  
+  try {
+    const url = new URL(targetUrl);
+    url.searchParams.set('action', 'getAnnouncements');
+    
+    const res = await fetch(url.toString(), {
+      method: 'GET'
+    });
+    
+    if (!res.ok) {
+      return { success: false, error: `HTTP ${res.status}` };
+    }
+    
+    const json = await res.json();
+    if (json.success && json.data) {
+      return { success: true, data: json.data };
+    }
+    return { success: false, error: json.error || 'お知らせの取得に失敗しました' };
+  } catch (e: any) {
+    console.error('GAS announcements load error:', e);
+    return { success: false, error: e.message };
   }
 }

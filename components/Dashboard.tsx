@@ -32,7 +32,8 @@ import {
   Menu,
   Calendar,
   Save,
-  RefreshCw
+  RefreshCw,
+  Bell
 } from 'lucide-react';
 import CaterpillarRoom, { AVAILABLE_FURNITURE, DAILY_SCHEDULE, getCurrentSchedule, FurnitureItem, isSleepingTime } from './CaterpillarRoom';
 import MiniGames from './MiniGames';
@@ -45,7 +46,9 @@ import {
   syncWithGas, 
   appendLogToGas, 
   appendChatToGas,
-  getOrCreateGuestUid
+  getOrCreateGuestUid,
+  Announcement,
+  fetchAnnouncementsFromGas
 } from '@/lib/google-sheets';
 import { auth, googleAuthProvider } from '@/lib/firebase';
 import { signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
@@ -449,6 +452,9 @@ function useIsClient() {
 export default function Dashboard() {
   const mounted = useIsClient();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [showAnnouncementsModal, setShowAnnouncementsModal] = useState(false);
+  const [lastReadAnnouncementId, setLastReadAnnouncementId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'status' | 'observation' | 'shop' | 'training' | 'chat'>('status');
   
   // Modals
@@ -479,6 +485,15 @@ export default function Dashboard() {
   const [evolutionNotice, setEvolutionNotice] = useState<StageInfo | null>(null);
   const [showAdoptModal, setShowAdoptModal] = useState(false);
   const [showNotReadyModal, setShowNotReadyModal] = useState(false);
+
+  const hasUnreadAnnouncements = announcements.length > 0 && announcements[0].id !== lastReadAnnouncementId;
+  const handleOpenAnnouncements = () => {
+    setShowAnnouncementsModal(true);
+    if (announcements.length > 0) {
+      setLastReadAnnouncementId(announcements[0].id);
+      localStorage.setItem('lsi_last_read_announcement', announcements[0].id);
+    }
+  };
   const [adoptPhase, setAdoptPhase] = useState<0|1|2|3|4|5>(0);
 
   // Shop clerk dialogue state
@@ -511,6 +526,7 @@ export default function Dashboard() {
             uid: parsed.uid || guestUid,
             points: parsed.points !== undefined ? parsed.points : 150,
             furniture: parsed.furniture || [],
+            equippedFurniture: parsed.equippedFurniture || parsed.furniture || [],
             discoveredStages: discovered,
             sprayCount: parsed.sprayCount !== undefined ? parsed.sprayCount : 0,
             daycareUntil: parsed.daycareUntil || null,
@@ -600,6 +616,8 @@ export default function Dashboard() {
               uid: user.uid,
               ownerName: fetched.ownerName || (user.displayName || '飼育員'),
               gasWebAppUrl: DEFAULT_GAS_URL,
+              furniture: fetched.furniture || prev.furniture || [],
+              equippedFurniture: fetched.equippedFurniture || fetched.furniture || prev.equippedFurniture || [],
               sprayCount: fetched.sprayCount !== undefined ? fetched.sprayCount : (prev.sprayCount || 0),
               daycareUntil: fetched.daycareUntil !== undefined ? fetched.daycareUntil : prev.daycareUntil,
               darlingIncident: fetched.darlingIncident !== undefined ? fetched.darlingIncident : prev.darlingIncident,
@@ -933,10 +951,12 @@ export default function Dashboard() {
     setClerkQuote(quote);
 
     setData(prev => {
+      const currentEquipped = prev.equippedFurniture || prev.furniture;
       const updated: CaterpillarData = {
         ...prev,
         points: prev.points - item.price,
         furniture: [...prev.furniture, item.id],
+        equippedFurniture: [...currentEquipped, item.id],
         logs: [
           { time: new Date().toLocaleTimeString(), text: `設備「${item.name}」を購入・設置 (-${item.price}pt)` },
           ...prev.logs.slice(0, 19)
@@ -947,6 +967,38 @@ export default function Dashboard() {
       return updated;
     });
   }, [data.furniture, data.points, triggerGasSync]);
+
+  const handleToggleFurniture = useCallback((item: FurnitureItem) => {
+    setData(prev => {
+      const currentEquipped = prev.equippedFurniture || prev.furniture;
+      const isEquipped = currentEquipped.includes(item.id);
+      
+      let nextEquipped;
+      let logText;
+      if (isEquipped) {
+        nextEquipped = currentEquipped.filter(id => id !== item.id);
+        logText = `設備「${item.name}」を撤去`;
+        setClerkQuote(`「『${item.name}』の撤去申請を受理しました。インベントリへ移送します。」`);
+      } else {
+        nextEquipped = [...currentEquipped, item.id];
+        logText = `設備「${item.name}」を再設置`;
+        setClerkQuote(`「『${item.name}』の再配置申請を受理しました。ケージ内へ展開します。」`);
+      }
+
+      const updated: CaterpillarData = {
+        ...prev,
+        equippedFurniture: nextEquipped,
+        logs: [
+          { time: new Date().toLocaleTimeString(), text: logText },
+          ...prev.logs.slice(0, 19)
+        ]
+      };
+      
+      appendLogToGas(prev.gasWebAppUrl, 'SHOP', logText, 0, prev.uid);
+      triggerGasSync(updated);
+      return updated;
+    });
+  }, [triggerGasSync]);
 
   // Shop purchase: Spray (80pt)
   const handleBuySpray = useCallback(() => {
@@ -1373,10 +1425,13 @@ export default function Dashboard() {
             </button>
             <button
               onClick={() => setIsMobileMenuOpen(true)}
-              className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-800 transition cursor-pointer"
+              className="relative p-2 rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-800 transition cursor-pointer"
               aria-label="メニューを開く"
             >
               <Menu className="w-5 h-5" />
+              {hasUnreadAnnouncements && (
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+              )}
             </button>
           </div>
 
@@ -1422,7 +1477,7 @@ export default function Dashboard() {
                 onFeed={handleFeed} 
                 stage={data.stage} 
                 formVariant={currentFormVariant}
-                ownedFurniture={data.furniture}
+                ownedFurniture={data.equippedFurniture || data.furniture}
                 onSquashLevelDown={handleSquashLevelDown}
                 sprayCount={data.sprayCount || 0}
                 onUseSpray={handleUseSpray}
@@ -1601,7 +1656,7 @@ export default function Dashboard() {
                 onFeed={handleFeed} 
                 stage={data.stage} 
                 formVariant={currentFormVariant}
-                ownedFurniture={data.furniture}
+                ownedFurniture={data.equippedFurniture || data.furniture}
                 observationMode={true}
                 onSquashLevelDown={handleSquashLevelDown}
                 sprayCount={data.sprayCount || 0}
@@ -1716,142 +1771,134 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Defensive & Consumable Items */}
-            <div className="flex flex-col gap-2.5">
-              <h3 className="text-xs font-black text-stone-700 flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-sky-600" />
-                <span>防衛・デイケア特需品</span>
-              </h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* -------------------------------------------------------------
-                    SHOP EXCLUSIVE PREMIUM FOOD
-                ------------------------------------------------------------- */}
-                <h4 className="mt-4 font-black text-stone-900 text-sm border-b-2 border-stone-200 pb-1 mb-2">プレミアムエサ（即時投与）</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-                  {/* Premium Ti/Se */}
-                  <div className="bg-white border-2 border-stone-200 rounded-2xl p-4 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-2xl">🧊</div>
-                      <div>
-                        <h4 className="font-black text-sm text-stone-900">超純水LSIプロテイン</h4>
-                        <p className="text-[10px] text-stone-500 font-medium">Ti/Se属性値を大幅アップ<br/>(EXP +1000)</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleBuyPremiumFood(200, 1000, '超純水LSIプロテイン', 'cabbage')}
-                      className="bg-blue-600 hover:bg-blue-500 text-white font-black text-xs px-3 py-2 rounded-xl shadow-xs transition active:scale-95 shrink-0"
-                    >
-                      200 TP
-                    </button>
-                  </div>
-
-                  {/* Premium Ne/Fe */}
-                  <div className="bg-white border-2 border-stone-200 rounded-2xl p-4 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-yellow-50 border border-yellow-200 flex items-center justify-center text-2xl">🍯</div>
-                      <div>
-                        <h4 className="font-black text-sm text-stone-900">黄金律ロイヤルゼリー</h4>
-                        <p className="text-[10px] text-stone-500 font-medium">Ne/Fe属性値を大幅アップ<br/>(EXP +1000)</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleBuyPremiumFood(200, 1000, '黄金律ロイヤルゼリー', 'sugar')}
-                      className="bg-yellow-500 hover:bg-yellow-400 text-white font-black text-xs px-3 py-2 rounded-xl shadow-xs transition active:scale-95 shrink-0"
-                    >
-                      200 TP
-                    </button>
+            {/* -------------------------------------------------------------
+                SHOP EXCLUSIVE PREMIUM FOOD
+            ------------------------------------------------------------- */}
+            <h4 className="font-black text-stone-900 text-sm border-b-2 border-stone-200 pb-1 mb-2">プレミアムエサ（即時投与）</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+              {/* Premium Ti/Se */}
+              <div className="bg-white border-2 border-stone-200 rounded-2xl p-4 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-2xl">🧊</div>
+                  <div>
+                    <h4 className="font-black text-sm text-stone-900">超純水LSIプロテイン</h4>
+                    <p className="text-[10px] text-stone-500 font-medium">Ti/Se属性値を大幅アップ<br/>(EXP +1000)</p>
                   </div>
                 </div>
-                
-                <h4 className="mt-4 font-black text-stone-900 text-sm border-b-2 border-stone-200 pb-1 mb-2">設備・サポート</h4>
-                {/* Item 1: Spray */}
-                <div className="bg-sky-50/60 border-2 border-sky-200 rounded-2xl p-4 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-sky-100 border border-sky-300 flex items-center justify-center text-3xl">
-                      💨
-                    </div>
-                    <div>
-                      <h4 className="font-black text-sm text-stone-900">防虫・規律スプレー</h4>
-                      <p className="text-[11px] text-stone-500 font-medium mt-0.5">
-                        ご褒美・ダーリンちゃんをシュッと即座に撃退！ (所持: {data.sprayCount || 0}回)
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleBuySpray}
-                    className="bg-sky-600 hover:bg-sky-500 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs transition active:scale-95 shrink-0 cursor-pointer"
-                  >
-                    80 TP
-                  </button>
-                </div>
+                <button
+                  onClick={() => handleBuyPremiumFood(200, 1000, '超純水LSIプロテイン', 'cabbage')}
+                  className="bg-blue-600 hover:bg-blue-500 text-white font-black text-xs px-3 py-2 rounded-xl shadow-xs transition active:scale-95 shrink-0"
+                >
+                  200 TP
+                </button>
+              </div>
 
-                {/* Item 2: Daycare */}
-                <div className="bg-emerald-50/60 border-2 border-emerald-200 rounded-2xl p-4 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-emerald-100 border border-emerald-300 flex items-center justify-center text-3xl">
-                      🏡
-                    </div>
-                    <div>
-                      <h4 className="font-black text-sm text-stone-900">芋虫保育園 24hパス</h4>
-                      <p className="text-[11px] text-stone-500 font-medium mt-0.5">
-                        放置しても安心！ 24時間ダーリンちゃんの乗っ取りを防ぐ
-                      </p>
-                    </div>
+              {/* Premium Ne/Fe */}
+              <div className="bg-white border-2 border-stone-200 rounded-2xl p-4 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-yellow-50 border border-yellow-200 flex items-center justify-center text-2xl">🍯</div>
+                  <div>
+                    <h4 className="font-black text-sm text-stone-900">黄金律ロイヤルゼリー</h4>
+                    <p className="text-[10px] text-stone-500 font-medium">Ne/Fe属性値を大幅アップ<br/>(EXP +1000)</p>
                   </div>
-                  <button
-                    onClick={handleBuyDaycare}
-                    className="bg-emerald-700 hover:bg-emerald-600 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs transition active:scale-95 shrink-0 cursor-pointer"
-                  >
-                    50 TP
-                  </button>
                 </div>
+                <button
+                  onClick={() => handleBuyPremiumFood(200, 1000, '黄金律ロイヤルゼリー', 'sugar')}
+                  className="bg-yellow-500 hover:bg-yellow-400 text-white font-black text-xs px-3 py-2 rounded-xl shadow-xs transition active:scale-95 shrink-0"
+                >
+                  200 TP
+                </button>
+              </div>
+            </div>
+            
+            <h4 className="font-black text-stone-900 text-sm border-b-2 border-stone-200 pb-1 mb-2">設備・サポート</h4>
+            <div className="grid grid-cols-1 gap-3">
+              {/* Item 1: Spray */}
+              <div className="bg-sky-50/60 border-2 border-sky-200 rounded-2xl p-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-sky-100 border border-sky-300 flex items-center justify-center text-3xl">
+                    💨
+                  </div>
+                  <div>
+                    <h4 className="font-black text-sm text-stone-900">防虫・規律スプレー</h4>
+                    <p className="text-[11px] text-stone-500 font-medium mt-0.5">
+                      ご褒美・ダーリンちゃんをシュッと即座に撃退！ (所持: {data.sprayCount || 0}回)
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleBuySpray}
+                  className="bg-sky-600 hover:bg-sky-500 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs transition active:scale-95 shrink-0 cursor-pointer"
+                >
+                  80 TP
+                </button>
+              </div>
 
-                {/* Item 3: Adoption */}
-                <div className="bg-amber-50/60 border-2 border-amber-200 rounded-2xl p-4 flex items-center justify-between gap-3 sm:col-span-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center text-3xl">
-                      🥚
-                    </div>
-                    <div>
-                      <h4 className="font-black text-sm text-stone-900">芋虫お見合い所（譲渡・リセット）</h4>
-                      <p className="text-[11px] text-stone-500 font-medium mt-0.5">
-                        現在の芋虫を図鑑（アーカイブ）に残し、新しい「卵（STAGE 0）」から育て直します。（※家具・ポイント・図鑑は引き継ぎ）<br/>
-                        <strong className="text-amber-700">※STAGE 5（蝶）に羽化後のみ利用可能</strong>
-                      </p>
-                    </div>
+              {/* Item 2: Daycare */}
+              <div className="bg-emerald-50/60 border-2 border-emerald-200 rounded-2xl p-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-100 border border-emerald-300 flex items-center justify-center text-3xl">
+                    🏡
                   </div>
-                  <button
-                    onClick={handleAdoptNewEgg}
-                    className="bg-amber-600 hover:bg-amber-500 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs transition active:scale-95 shrink-0 cursor-pointer"
-                  >
-                    無料
-                  </button>
+                  <div>
+                    <h4 className="font-black text-sm text-stone-900">芋虫保育園 24hパス</h4>
+                    <p className="text-[11px] text-stone-500 font-medium mt-0.5">
+                      放置しても安心！ 24時間ダーリンちゃんの乗っ取りを防ぐ
+                    </p>
+                  </div>
                 </div>
+                <button
+                  onClick={handleBuyDaycare}
+                  className="bg-emerald-700 hover:bg-emerald-600 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs transition active:scale-95 shrink-0 cursor-pointer"
+                >
+                  150 TP
+                </button>
+              </div>
+
+              {/* Item 3: Adoption */}
+              <div className="bg-amber-50/60 border-2 border-amber-200 rounded-2xl p-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center text-3xl">
+                    🥚
+                  </div>
+                  <div>
+                    <h4 className="font-black text-sm text-stone-900">芋虫お見合い所（譲渡・リセット）</h4>
+                    <p className="text-[11px] text-stone-500 font-medium mt-0.5">
+                      現在の芋虫を図鑑（アーカイブ）に残し、新しい「卵（STAGE 0）」から育て直します。（※家具・ポイント・図鑑は引き継ぎ）<br/>
+                      <strong className="text-amber-700">※STAGE 5（蝶）に羽化後のみ利用可能</strong>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleAdoptNewEgg}
+                  className="bg-amber-600 hover:bg-amber-500 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs transition active:scale-95 shrink-0 cursor-pointer"
+                >
+                  無料
+                </button>
               </div>
             </div>
 
             {/* Furniture Grid */}
-            <div className="flex flex-col gap-2.5">
-              <h3 className="text-xs font-black text-stone-700 flex items-center gap-1.5">
+            <div className="flex flex-col gap-2.5 mt-2">
+              <h3 className="text-xs font-black text-stone-700 flex items-center gap-1.5 border-b-2 border-stone-200 pb-1 mb-2">
                 <Store className="w-4 h-4 text-emerald-700" />
                 <span>ケージ内統制設備・家具一覧（全8種）</span>
               </h3>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {AVAILABLE_FURNITURE.map(item => {
                   const isOwned = data.furniture.includes(item.id);
+                  const isEquipped = isOwned && (data.equippedFurniture || data.furniture).includes(item.id);
                   return (
                     <div 
                       key={item.id}
                       className={`border-2 rounded-2xl p-4 flex items-center justify-between gap-3 transition-all ${
                         isOwned 
-                          ? 'bg-stone-50 border-stone-200 opacity-85' 
+                          ? 'bg-stone-50 border-stone-200' 
                           : 'bg-white border-stone-300 hover:border-emerald-500 shadow-xs'
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-stone-100 border border-stone-200 flex items-center justify-center text-3xl shrink-0">
+                        <div className={`w-12 h-12 rounded-xl border flex items-center justify-center text-3xl shrink-0 ${isOwned ? (isEquipped ? 'bg-emerald-50 border-emerald-200' : 'bg-stone-200 border-stone-300 opacity-60') : 'bg-stone-100 border-stone-200'}`}>
                           {item.icon}
                         </div>
                         <div>
@@ -1861,17 +1908,22 @@ export default function Dashboard() {
                           </p>
                         </div>
                       </div>
-
-                      <div className="shrink-0">
+                      <div className="shrink-0 flex flex-col gap-2">
                         {isOwned ? (
-                          <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1">
-                            <Check className="w-3.5 h-3.5" />
-                            <span>設置済</span>
-                          </span>
+                          <button
+                            onClick={() => handleToggleFurniture(item)}
+                            className={`text-xs font-black px-3.5 py-2 rounded-xl shadow-xs transition active:scale-95 flex items-center justify-center cursor-pointer ${
+                              isEquipped 
+                                ? 'bg-stone-200 hover:bg-stone-300 text-stone-700 border border-stone-300' 
+                                : 'bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-700'
+                            }`}
+                          >
+                            {isEquipped ? '撤去する' : '設置する'}
+                          </button>
                         ) : (
                           <button
                             onClick={() => handleBuyFurniture(item)}
-                            className="bg-emerald-700 hover:bg-emerald-600 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs transition active:scale-95 flex items-center gap-1 cursor-pointer"
+                            className="bg-emerald-700 hover:bg-emerald-600 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-xs transition active:scale-95 flex items-center justify-center gap-1 cursor-pointer"
                           >
                             <span>{item.price} TP</span>
                           </button>
@@ -1882,7 +1934,6 @@ export default function Dashboard() {
                 })}
               </div>
             </div>
-
           </div>
         )}
 
@@ -2059,6 +2110,68 @@ export default function Dashboard() {
                 className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-xl transition text-xs cursor-pointer shadow-xs"
               >
                 理解した（閉じる）
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* -------------------------------------------------------------
+          MODAL: ANNOUNCEMENTS (お知らせ)
+      ------------------------------------------------------------- */}
+      <AnimatePresence>
+        {showAnnouncementsModal && (
+          <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white border-2 border-stone-300 rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl flex flex-col gap-4 max-h-[85vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between border-b-2 border-stone-100 pb-3">
+                <h3 className="text-lg font-black text-stone-900 flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-emerald-700" />
+                  <span>運営からのお知らせ</span>
+                </h3>
+                <button 
+                  onClick={() => setShowAnnouncementsModal(false)}
+                  className="p-1 rounded-lg text-stone-400 hover:text-stone-700 cursor-pointer transition active:scale-95"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                {announcements.length === 0 ? (
+                  <p className="text-sm text-stone-500 font-bold text-center py-8">現在お知らせはありません。</p>
+                ) : (
+                  announcements.map((ann, idx) => (
+                    <div key={ann.id} className="bg-stone-50 border border-stone-200 rounded-xl p-4 flex flex-col gap-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
+                          {ann.date}
+                        </span>
+                        {idx === 0 && ann.id !== lastReadAnnouncementId && (
+                          <span className="text-[10px] font-black text-red-500 flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                            NEW
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-black text-sm text-stone-900 leading-snug">{ann.title}</h4>
+                      <p className="text-xs text-stone-600 font-medium whitespace-pre-wrap leading-relaxed mt-1">
+                        {ann.content}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <button
+                onClick={() => setShowAnnouncementsModal(false)}
+                className="w-full bg-stone-800 hover:bg-stone-700 text-white font-black py-3.5 rounded-xl shadow-xs transition active:scale-95 cursor-pointer mt-2"
+              >
+                閉じる
               </button>
             </motion.div>
           </div>
@@ -2358,6 +2471,20 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      handleOpenAnnouncements();
+                    }}
+                    className="flex items-center gap-3 p-2.5 rounded-xl bg-stone-50 hover:bg-stone-100 border border-stone-200 text-stone-900 text-xs font-bold text-left cursor-pointer transition relative"
+                  >
+                    <Bell className="w-4 h-4 text-emerald-700" />
+                    <span>🔔 運営からのお知らせ</span>
+                    {hasUnreadAnnouncements && (
+                      <span className="absolute right-3 w-2 h-2 rounded-full bg-red-500"></span>
+                    )}
+                  </button>
+
                   <button
                     onClick={() => {
                       setIsMobileMenuOpen(false);

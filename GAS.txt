@@ -47,7 +47,28 @@ function doGet(e) {
       return createJsonResponse({ success: true, data: null });
     }
     
-    return createJsonResponse({ success: true, message: 'LSI Caterpillar GAS Backend (v3) is running.' });
+    if (action === 'getAnnouncements') {
+      const sheet = ss.getSheetByName('お知らせ');
+      if (!sheet) {
+        return createJsonResponse({ success: true, data: [] });
+      }
+      const data = sheet.getDataRange().getValues();
+      const announcements = [];
+      // skip header row 0
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0]) {
+          announcements.push({
+            id: String(data[i][0]),
+            date: String(data[i][1]),
+            title: String(data[i][2]),
+            content: String(data[i][3])
+          });
+        }
+      }
+      return createJsonResponse({ success: true, data: announcements.reverse() }); // newest first
+    }
+    
+    return createJsonResponse({ success: true, message: 'LSI Caterpillar GAS Backend (v4) is running.' });
   } catch (error) {
     return createJsonResponse({ success: false, error: error.toString() });
   }
@@ -183,6 +204,7 @@ function initSheetsIfNeeded(ss) {
     '獲得EXP', 
     '統制ポイント', 
     '所有家具 (JSON)', 
+    '設置中家具 (JSON)',
     'アンロック図鑑 (JSON)',
     '防虫スプレー回数',
     '保育園保護期限',
@@ -201,14 +223,37 @@ function initSheetsIfNeeded(ss) {
     statusSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     statusSheet.getRange(1, 1, 1, headers.length).setBackground('#d1fae5').setFontWeight('bold');
   } else {
-    // Check if headers need updating to new 19 columns
     const currentCols = statusSheet.getLastColumn();
+    // Upgrade existing data to 20 columns if they only have 19 or less
     if (currentCols < headers.length) {
+      // First, get all data
+      const data = statusSheet.getDataRange().getValues();
+      
+      // Update header
       statusSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
       statusSheet.getRange(1, 1, 1, headers.length).setBackground('#d1fae5').setFontWeight('bold');
+      
+      // We must insert a blank column for "設置中家具" at column 10 (index 9) for all existing rows 
+      // if they only had 19 columns. But wait, if they have less columns, their data index is shifted!
+      // To be safe, we will just rely on parseRowToUserObject checking row length on read, and saveStatus will overwrite with 20 columns.
+      // But it's better to just insert the missing column so formatting aligns.
+      if (currentCols === 19) {
+        statusSheet.insertColumnBefore(10);
+        statusSheet.getRange(1, 10).setValue('設置中家具 (JSON)');
+      }
     }
   }
   
+  let noticeSheet = ss.getSheetByName('お知らせ');
+  if (!noticeSheet) {
+    noticeSheet = ss.insertSheet('お知らせ');
+    const noticeHeaders = ['ID', '日付', 'タイトル', '本文(改行可)'];
+    noticeSheet.getRange(1, 1, 1, noticeHeaders.length).setValues([noticeHeaders]);
+    noticeSheet.getRange(1, 1, 1, noticeHeaders.length).setBackground('#fde68a').setFontWeight('bold');
+    
+    // Add sample announcement
+    noticeSheet.appendRow(['msg_001', Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd'), 'LSI規律お知らせ機能追加', 'お知らせをスプレッドシートから配信できるようになりました。']);
+  }
   let logSheet = ss.getSheetByName('行動ログ');
   if (!logSheet) {
     logSheet = ss.insertSheet('行動ログ');

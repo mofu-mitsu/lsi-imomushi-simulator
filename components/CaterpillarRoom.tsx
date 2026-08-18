@@ -678,7 +678,7 @@ export default function CaterpillarRoom({
         const dist = Math.sqrt(dx * dx + dy * dy);
 
         if (Math.abs(dx) > 1.2) {
-          setFacingRight(dx > 0);
+          setTimeout(() => setFacingRight(dx > 0), 0);
         }
 
         // Active Play collision with ball toy
@@ -689,16 +689,18 @@ export default function CaterpillarRoom({
             const dirX = dx !== 0 ? (dx / Math.abs(dx)) : (Math.random() > 0.5 ? 1 : -1);
             const dirY = dy !== 0 ? (dy / Math.abs(dy)) : (Math.random() > 0.5 ? 1 : -1);
             
-            setBallVelocity({ vx: dirX * speed, vy: dirY * speed });
-            
-            const ballComments = [
-              '（コツン…！）運動量保存の法則に基づきボールを加速させた。',
-              '（ポーン！）物理トイへの接触角45度。完全弾性衝突を観測。',
-              'ボールの速度ベクトルを計算。ケージ内壁での反射角を予測中。',
-              '自発的物理アクティビティ完了。骨格の敏捷性を確認。'
-            ];
-            setBubbleText(ballComments[Math.floor(Math.random() * ballComments.length)]);
-            setTimeout(() => setBubbleText(null), 3500);
+            setTimeout(() => {
+              setBallVelocity({ vx: dirX * speed, vy: dirY * speed });
+              
+              const ballComments = [
+                '（コツン…！）運動量保存の法則に基づきボールを加速させた。',
+                '（ポーン！）物理トイへの接触角45度。完全弾性衝突を観測。',
+                'ボールの速度ベクトルを計算。ケージ内壁での反射角を予測中。',
+                '自発的物理アクティビティ完了。骨格の敏捷性を確認。'
+              ];
+              setBubbleText(ballComments[Math.floor(Math.random() * ballComments.length)]);
+              setTimeout(() => setBubbleText(null), 3500);
+            }, 0);
           }
         }
 
@@ -706,46 +708,47 @@ export default function CaterpillarRoom({
         if (intruder && intruder.type === 'gohoubi' && intruder.soupPlaced) {
           const distToSoup = Math.sqrt(Math.pow(prev.x - intruder.x, 2) + Math.pow(prev.y - intruder.y, 2));
           if (distToSoup < 5) {
-            setBubbleText('モゾ…うぐっ…！ ご褒美の風呂上がり豚骨出汁を摂取してしまった……！ 油分過多で規律が崩壊（EXP低下）……！');
-            if (onSquashLevelDown) {
-              onSquashLevelDown(30, 'ご褒美の風呂上がり出汁摂取による規律崩壊');
-            }
-            setIntruder(null);
-            setTimeout(() => setBubbleText(null), 4500);
+            setTimeout(() => {
+              setBubbleText('モゾ…うぐっ…！ ご褒美の風呂上がり豚骨出汁を摂取してしまった……！ 油分過多で規律が崩壊（EXP低下）……！');
+              if (onSquashLevelDown) {
+                onSquashLevelDown(30, 'ご褒美の風呂上がり出汁摂取による規律崩壊');
+              }
+              setIntruder(null);
+              setTimeout(() => setBubbleText(null), 4500);
+            }, 0);
           }
         }
 
         if (dist < 3) {
-          if (foods.length > 0) {
-            const eaten = foods[0];
-            setFoods(f => f.slice(1));
-            
-            const comments = [
-              `モゾ…「${eaten.name}」の分子結合を承認。`,
-              '（咀嚼音）……細胞膜の強度を確認。',
-              '摂取完了。境界線防衛エネルギーに変換。',
-              '栄養バランスを再計算。規律通りに消化する。'
-            ];
-            const comment = comments[Math.floor(Math.random() * comments.length)];
-            setBubbleText(comment);
-            setTimeout(() => setBubbleText(null), 3500);
+          setTimeout(() => {
+            if (foods.length > 0) {
+              const eaten = foods[0];
+              setFoods(f => f.slice(1));
+              
+              const comments = [
+                `モゾ…「${eaten.name}」の分子結合を承認。`,
+                '（咀嚼音）……細胞膜の強度を確認。',
+                '摂取完了。境界線防衛エネルギーに変換。',
+                '栄養バランスを再計算。規律通りに消化する。'
+              ];
+              const comment = comments[Math.floor(Math.random() * comments.length)];
+              setBubbleText(comment);
+              setTimeout(() => setBubbleText(null), 3500);
 
-            setTimeout(() => {
               onFeed(eaten.exp, eaten.name, eaten.type);
-            }, 0);
-          } else {
-            const nearbyFurn = AVAILABLE_FURNITURE.find(
-              f => ownedFurniture.includes(f.id) && Math.sqrt(Math.pow(f.x - target.x, 2) + Math.pow(f.y - (target.y - 4), 2)) < 7
-            );
-            if (nearbyFurn && Math.random() < 0.75) {
-              const texts = nearbyFurn.interactionTexts || [nearbyFurn.desc];
-              const randomText = texts[Math.floor(Math.random() * texts.length)];
-              setBubbleText(randomText);
-              setTimeout(() => setBubbleText(null), 4000);
+            } else {
+              const nearbyFurn = AVAILABLE_FURNITURE.find(
+                f => ownedFurniture.includes(f.id) && Math.sqrt(Math.pow(f.x - target.x, 2) + Math.pow(f.y - (target.y - 4), 2)) < 7
+              );
+              if (nearbyFurn && Math.random() < 0.75) {
+                const texts = nearbyFurn.interactionTexts || [nearbyFurn.desc];
+                const randomText = texts[Math.floor(Math.random() * texts.length)];
+                setBubbleText(randomText);
+                setTimeout(() => setBubbleText(null), 4000);
+              }
             }
-          }
-
-          setCatTarget(null);
+            setCatTarget(null);
+          }, 0);
           return target;
         }
 
