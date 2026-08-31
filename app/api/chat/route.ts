@@ -19,6 +19,71 @@ function cleanModelResponse(text: string): string {
   return text.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').trim();
 }
 
+// Normalize message history for OpenAI / Groq compatible format
+function normalizeGroqMessages(systemPrompt: string, history: any[], userMessage: string) {
+  const messages: { role: string; content: string }[] = [
+    { role: 'system', content: systemPrompt }
+  ];
+
+  for (const msg of history) {
+    if (!msg || !msg.text) continue;
+    const role = msg.role === 'lsi' ? 'assistant' : 'user';
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg && lastMsg.role === role) {
+      lastMsg.content += `\n${msg.text}`;
+    } else {
+      messages.push({ role, content: msg.text });
+    }
+  }
+
+  const lastMsg = messages[messages.length - 1];
+  if (lastMsg && lastMsg.role === 'user') {
+    lastMsg.content += `\n${userMessage}`;
+  } else {
+    messages.push({ role: 'user', content: userMessage });
+  }
+
+  return messages;
+}
+
+// Normalize contents for Gemini API (requires alternating user/model turns, starting with user)
+function normalizeGeminiContents(history: any[], userMessage: string) {
+  const rawTurns: { role: 'user' | 'model'; text: string }[] = [];
+
+  for (const msg of history) {
+    if (!msg || !msg.text) continue;
+    const role: 'user' | 'model' = msg.role === 'lsi' ? 'model' : 'user';
+    rawTurns.push({ role, text: msg.text });
+  }
+  rawTurns.push({ role: 'user', text: userMessage });
+
+  // Merge consecutive turns with the same role
+  const mergedTurns: { role: 'user' | 'model'; text: string }[] = [];
+  for (const turn of rawTurns) {
+    const last = mergedTurns[mergedTurns.length - 1];
+    if (last && last.role === turn.role) {
+      last.text += `\n${turn.text}`;
+    } else {
+      mergedTurns.push({ role: turn.role, text: turn.text });
+    }
+  }
+
+  // Ensure starts with user
+  while (mergedTurns.length > 0 && mergedTurns[0].role !== 'user') {
+    mergedTurns.shift();
+  }
+
+  // If empty (should not happen since we pushed userMessage), fallback
+  if (mergedTurns.length === 0) {
+    mergedTurns.push({ role: 'user', text: userMessage });
+  }
+
+  return mergedTurns.map(t => ({
+    role: t.role,
+    parts: [{ text: t.text }]
+  }));
+}
+
 async function callGroqWithFallback(systemPrompt: string, userMessage: string, groqApiKey: string, history: any[] = []): Promise<{ text: string; model: string }> {
   const candidateModels = [
     'openai/gpt-oss-120b',
@@ -27,14 +92,10 @@ async function callGroqWithFallback(systemPrompt: string, userMessage: string, g
     'qwen/qwen3.6-27b'
   ];
 
+  const messages = normalizeGroqMessages(systemPrompt, history, userMessage);
+
   for (const model of candidateModels) {
     try {
-      const messages = [
-        { role: 'system', content: systemPrompt },
-        ...history.map(msg => ({ role: msg.role === 'lsi' ? 'assistant' : 'user', content: msg.text })),
-        { role: 'user', content: userMessage }
-      ];
-
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -74,7 +135,9 @@ export async function POST(req: NextRequest) {
     const { 
       message, 
       stageName = 'LSI芋虫',
+      caterpillarName = '',
       ownerName = '',
+      selfType = '',
       history = []
     } = body;
 
@@ -83,15 +146,23 @@ export async function POST(req: NextRequest) {
     }
 
     const keeperName = ownerName && ownerName !== '未設定' ? ownerName : '飼育員';
+    const customNameStr = caterpillarName && caterpillarName !== '名無し' ? `、つけられた個体名は「${caterpillarName}」` : '';
+    const keeperTypeStr = selfType && selfType !== '未設定' ? `（自認タイプ: ${selfType}）` : '';
 
-    const systemPrompt = `あなたは飼育ケージの中で暮らす「${stageName}」です。
-冷静沈着で理路整然としており、ケージ内の規律・境界線・キャベツの葉脈の秩序を守ることに強いこだわりを持っています。
+    const systemPrompt = `あなたは飼育ケージの中で暮らす「${stageName}」${customNameStr}です。
+目の前にいる飼育員は「${keeperName}」${keeperTypeStr}です。
 
-【対話の絶対ルール】
-1. 報告書や箇条書きの文書（「件名」「1. 概要」など）を作らないでください。相手に向けた自然な「芋虫のセリフ」として100〜200文字程度で返答してください。
-2. 「Fe」「1F」「2V」「LSI」「ソシオニクス」「心理機能」「パラメータ」といった専門用語・型記号を絶対に直接発言しないでください。
-3. 相手のことは「${keeperName}」「貴殿」と呼び、冷静かつ理詰めの口調（「〜だ」「〜せよ」「〜と判断する」）で話してください。
-4. 芋虫らしい仕草描写（「モゾ…」「（葉を咀嚼）」「（境界線を凝視）」など）を自然に交えてください。`;
+【性格・キャラクター設定】
+・冷静沈着で極めて理路整然。論理と境界線、ケージ内の規律とキャベツの秩序を守ることに強い美学を持っています。
+・一見厳格で理屈っぽいですが、飼育員（${keeperName}）との対話を密かに好んでおり、規律ある関係を大切にしています。
+${caterpillarName && caterpillarName !== '名無し' ? `・飼育員に「${caterpillarName}」と名付けられていることを認識しています。` : ''}
+
+【対話・文脈把握のルール】
+1. **文脈の維持**: これまでの会話の流れや直前の発言内容を正しく理解し、直前の会話にしっかり受け答えをして自然に会話を繋げてください（単発の定型文で流さず、相手の発言内容に触れてください）。
+2. **形式**: 報告書や箇条書き（「件名」「1. 概要」など）は作成せず、自然な「芋虫のセリフ」として100〜200文字程度で返答してください。
+3. **NGワード**: 「Fe」「1F」「2V」「LSI」「ソシオニクス」「心理機能」「パラメータ」といったメタな心理学用語や記号を直接発言しないでください。
+4. **呼称・口調**: 飼育員のことは「${keeperName}」または「貴殿」と呼び、理詰めで引き締まった口調（「〜だ」「〜せよ」「〜と判断する」「〜ではないか」）で話してください。
+5. **仕草描写**: 芋虫らしい仕草（「モゾ…」「（葉脈を凝視）」「（姿勢を正す）」「（咀嚼を止めて見つめる）」など）を適度に交えてください。`;
 
     let aiMessage = '';
     let provider = 'AI';
@@ -109,26 +180,20 @@ export async function POST(req: NextRequest) {
 
     // 2. Fallback to Gemini if Groq was unavailable or failed
     if (!aiMessage) {
-      const geminiModels = ['gemini-3.1-flash-lite', 'gemini-3.7-flash', 'gemini-flash-latest'];
+      const geminiModels = ['gemini-3.7-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
       const ai = getGeminiClient();
 
       if (ai) {
         for (const model of geminiModels) {
           try {
-            const contents = [
-              ...history.map((msg: any) => ({
-                role: msg.role === 'lsi' ? 'model' : 'user',
-                parts: [{ text: msg.text }]
-              })),
-              { role: 'user', parts: [{ text: message }] }
-            ];
+            const contents = normalizeGeminiContents(history, message);
 
             const response = await ai.models.generateContent({
               model,
               contents,
               config: {
                 systemInstruction: systemPrompt,
-                temperature: 0.8,
+                temperature: 0.7,
               },
             });
             const text = response.text?.trim() || '';
@@ -148,7 +213,7 @@ export async function POST(req: NextRequest) {
     if (!aiMessage) {
       provider = 'Local Logic Protocol';
       aiMessage = `モゾ…【緊急解析プロトコル起動】
-貴殿の発言「${message}」に含まれる論理構造を検知した。
+貴殿（${keeperName}）の発言「${message}」に含まれる論理構造を検知した。
 現在、外部通信プロセッサの負荷が境界線を超過しているため、ローカル論理ユニットにより応答する。
 規則に従い、規律ある行動を継続されたい。`;
     }

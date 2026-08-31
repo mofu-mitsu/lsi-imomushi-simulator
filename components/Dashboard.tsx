@@ -1219,7 +1219,7 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
-          history: chatMessages.slice(-6).map(m => ({ role: m.role, text: m.text })),
+          history: chatMessages.slice(-12).map(m => ({ role: m.role, text: m.text })),
           stageName: data.name,
           caterpillarName: data.customName,
           stage: data.stage,
