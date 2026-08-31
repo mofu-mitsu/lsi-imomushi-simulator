@@ -469,8 +469,10 @@ export default function CaterpillarRoom({
   // Handle Adopt Phase forced movement
   useEffect(() => {
     if (adoptPhase === 1 || adoptPhase === 2) {
-      setCatPos({ x: 45, y: 50 });
-      setFacingRight(true);
+      setTimeout(() => {
+        setCatPos({ x: 45, y: 50 });
+        setFacingRight(true);
+      }, 0);
     }
   }, [adoptPhase]);
 

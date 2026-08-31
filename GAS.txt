@@ -1,7 +1,7 @@
 /**
  * 🐛 LSI芋虫 育成・統制シミュレーター用 Google Apps Script (GAS)
  * 
- * 【Googleアカウント別 & ゲスト個別データ完全保存・アイテム復元対応版 (v3)】
+ * 【既存データ完全保護・全自動スマート修復 & マルチアカウント対応版 (v5)】
  * 
  * 【導入手順】
  * 1. お手持ちの Google スプレッドシート を開きます。
@@ -11,11 +11,54 @@
  * 5. 種類を「ウェブアプリ」にし、以下を設定します：
  *    - 次のユーザーとして実行: 「自分」
  *    - アクセスできるユーザー: 「全員」
- * 6. 「デプロイ」を押して表示された「ウェブアプリ URL」をコピーし、
- *    LSI芋虫アプリに入力するか、DEFAULT_GAS_URLに設定すれば連携完了です！
+ * 6. 「デプロイ」を押して表示された「ウェブアプリ URL」をコピーして完了です！
  * 
- * ※ 既に古いシートが存在する場合でも、自動で新しい列定義に合わせてアップグレードされます。
+ * 【💡 既存のバラバラになったデータを一瞬で綺麗に整列・修復する方法】
+ * 1. コードを保存後、スプレッドシートの画面を再読み込み（F5）します。
+ * 2. 上部メニューに「🐛 LSI芋虫データ管理」というメニューが表示されます。
+ * 3. 「⚡ 既存データの列ズレを全自動修復する（バックアップ付き）」をクリックしてください。
+ *    ※ 自動で元のシートのバックアップを作成してから、すべてのユーザーの行を綺麗な22列に整頓します。
+ *    ※ 誰のデータも消去されず、安全に修復されます！
  */
+
+const SHEET_NAME_STATUS = '個体ステータス_アカウント別';
+const SHEET_NAME_NOTICE = 'お知らせ';
+const SHEET_NAME_LOG = '行動ログ';
+const SHEET_NAME_CHAT = '交信記録';
+
+const STANDARD_HEADERS = [
+  'UID (アカウント識別子)', 
+  '飼育員名', 
+  '自認タイプ', 
+  '個体ID', 
+  '個体名 (カスタム名)', 
+  '形態名 (ステージ名)', 
+  '進化段階', 
+  '獲得EXP', 
+  '統制ポイント', 
+  '所有家具 (JSON)', 
+  '設置中家具 (JSON)',
+  'アンロック図鑑 (JSON)',
+  '防虫スプレー回数',
+  '保育園保護期限',
+  'エサ摂取統計 (JSON)',
+  '形態バリアント',
+  'ダーリンインシデント',
+  '潰された回数',
+  '最終給餌日時', 
+  '最終交信日時', 
+  '最終更新日時',
+  '既読お知らせ (JSON)'
+];
+
+// スプレッドシートを開いたときに修復メニューを追加
+function onOpen() {
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu('🐛 LSI芋虫データ管理')
+    .addItem('⚡ 既存データの列ズレを全自動修復する（バックアップ付き）', 'autoFixAndMigrateSheetData')
+    .addItem('📦 念のためバックアップシートを作成する', 'createBackupSheet')
+    .addToUi();
+}
 
 function doGet(e) {
   try {
@@ -26,7 +69,7 @@ function doGet(e) {
     const uid = (e && e.parameter && e.parameter.uid) || '';
     
     if (action === 'getStatus' || action === 'getUserStatus') {
-      const sheet = ss.getSheetByName('個体ステータス_アカウント別');
+      const sheet = ss.getSheetByName(SHEET_NAME_STATUS);
       if (!sheet) {
         return createJsonResponse({ success: false, error: 'Sheet not found' });
       }
@@ -48,7 +91,7 @@ function doGet(e) {
     }
     
     if (action === 'getAnnouncements') {
-      const sheet = ss.getSheetByName('お知らせ');
+      const sheet = ss.getSheetByName(SHEET_NAME_NOTICE);
       if (!sheet) {
         return createJsonResponse({ success: true, data: [] });
       }
@@ -68,7 +111,7 @@ function doGet(e) {
       return createJsonResponse({ success: true, data: announcements.reverse() }); // newest first
     }
     
-    return createJsonResponse({ success: true, message: 'LSI Caterpillar GAS Backend (v4) is running.' });
+    return createJsonResponse({ success: true, message: 'LSI Caterpillar GAS Backend (v5) is running.' });
   } catch (error) {
     return createJsonResponse({ success: false, error: error.toString() });
   }
@@ -84,7 +127,7 @@ function doPost(e) {
     const nowStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
     
     if (action === 'saveStatus') {
-      const sheet = ss.getSheetByName('個体ステータス_アカウント別');
+      const sheet = ss.getSheetByName(SHEET_NAME_STATUS);
       const data = postData.data;
       const targetUid = String(data.uid || 'guest_default');
       
@@ -104,21 +147,24 @@ function doPost(e) {
         data.ownerName || '未設定',                           // 2: 飼育員名
         data.selfType || '未設定',                            // 3: 自認タイプ
         data.id || '000001',                                 // 4: 個体ID
-        data.name || 'LSI芋虫',                              // 5: 名前・肩書
-        data.stage !== undefined ? data.stage : 0,           // 6: 進化段階
-        data.exp !== undefined ? data.exp : 0,               // 7: 獲得EXP
-        data.points !== undefined ? data.points : 0,         // 8: 統制ポイント
-        JSON.stringify(data.furniture || []),                // 9: 所有家具
-        JSON.stringify(data.discoveredStages || []),         // 10: アンロック図鑑
-        data.sprayCount !== undefined ? data.sprayCount : 0, // 11: 防虫スプレー所持数
-        data.daycareUntil || '',                             // 12: 保育園保護期限
-        JSON.stringify(data.foodStats || { cabbage: 0, apple: 0, glucose: 0, sugar: 0, twig: 0 }), // 13: エサ摂取統計
-        data.formVariant || 'crystal',                       // 14: 形態バリアント
-        data.darlingIncident ? true : false,                 // 15: ダーリンインシデント
-        data.squashCount !== undefined ? data.squashCount : 0, // 16: 潰された回数
-        data.lastFedAt || nowStr,                            // 17: 最終給餌日時
-        data.lastMessageAt || nowStr,                        // 18: 最終交信日時
-        nowStr                                               // 19: 最終更新日時
+        data.customName || '名無し',                         // 5: 個体名
+        data.name || 'LSI芋虫（幼虫）',                       // 6: 形態名
+        data.stage !== undefined ? data.stage : 0,           // 7: 進化段階
+        data.exp !== undefined ? data.exp : 0,               // 8: 獲得EXP
+        data.points !== undefined ? data.points : 0,         // 9: 統制ポイント
+        JSON.stringify(data.furniture || []),                // 10: 所有家具
+        JSON.stringify(data.equippedFurniture || []),        // 11: 設置中家具 (JSON)
+        JSON.stringify(data.discoveredStages || ['LSI芋虫（幼虫）']), // 12: アンロック図鑑
+        data.sprayCount !== undefined ? data.sprayCount : 0, // 13: 防虫スプレー所持数
+        data.daycareUntil || '',                             // 14: 保育園保護期限
+        JSON.stringify(data.foodStats || { cabbage: 0, apple: 0, glucose: 0, sugar: 0, twig: 0 }), // 15: エサ摂取統計
+        data.formVariant || 'crystal',                       // 16: 形態バリアント
+        data.darlingIncident ? true : false,                 // 17: ダーリンインシデント
+        data.squashCount !== undefined ? data.squashCount : 0, // 18: 潰された回数
+        data.lastFedAt || nowStr,                            // 19: 最終給餌日時
+        data.lastMessageAt || nowStr,                        // 20: 最終交信日時
+        nowStr,                                              // 21: 最終更新日時
+        JSON.stringify(data.readAnnouncements || [])         // 22: 既読お知らせ (JSON)
       ];
       
       if (targetRowIndex > 0) {
@@ -133,7 +179,7 @@ function doPost(e) {
     }
     
     if (action === 'appendLog') {
-      const sheet = ss.getSheetByName('行動ログ');
+      const sheet = ss.getSheetByName(SHEET_NAME_LOG);
       sheet.appendRow([
         nowStr,
         postData.uid || 'guest',
@@ -145,7 +191,7 @@ function doPost(e) {
     }
     
     if (action === 'appendChat') {
-      const sheet = ss.getSheetByName('交信記録');
+      const sheet = ss.getSheetByName(SHEET_NAME_CHAT);
       sheet.appendRow([
         nowStr,
         postData.uid || 'guest',
@@ -161,109 +207,283 @@ function doPost(e) {
   }
 }
 
+/**
+ * スマート行パーサー：列ズレが発生していても型と内容から自動復元する
+ */
 function parseRowToUserObject(row) {
-  return {
-    uid: row[0],
-    ownerName: row[1],
-    selfType: row[2],
-    id: row[3],
-    name: row[4],
-    stage: Number(row[5]) || 0,
-    exp: Number(row[6]) || 0,
-    points: Number(row[7]) || 0,
-    furniture: safeJsonParse(row[8], []),
-    discoveredStages: safeJsonParse(row[9], ['LSI芋虫（幼虫）']),
-    sprayCount: Number(row[10]) || 0,
-    daycareUntil: row[11] || null,
-    foodStats: safeJsonParse(row[12], { cabbage: 0, apple: 0, glucose: 0, sugar: 0, twig: 0 }),
-    formVariant: row[13] || 'crystal',
-    darlingIncident: row[14] === true || String(row[14]) === 'true',
-    squashCount: Number(row[15]) || 0,
-    lastFedAt: row[16] || '',
-    lastMessageAt: row[17] || ''
+  const result = {
+    uid: String(row[0] || 'guest_default'),
+    ownerName: String(row[1] || '飼育員'),
+    selfType: String(row[2] || '未設定'),
+    id: String(row[3] || '000001'),
+    customName: '名無し',
+    name: 'LSI芋虫（幼虫）',
+    stage: 0,
+    exp: 0,
+    points: 150,
+    furniture: [],
+    equippedFurniture: [],
+    discoveredStages: ['LSI芋虫（幼虫）'],
+    sprayCount: 0,
+    daycareUntil: null,
+    foodStats: { cabbage: 0, apple: 0, glucose: 0, sugar: 0, twig: 0 },
+    formVariant: 'crystal',
+    darlingIncident: false,
+    squashCount: 0,
+    lastFedAt: '',
+    lastMessageAt: '',
+    readAnnouncements: []
   };
+
+  // もし既に標準22列で整列されている場合（列5が文字列で列6が形態名など）
+  if (row.length >= 20 && String(row[5]).includes('芋虫') || String(row[5]).includes('幼虫') || String(row[5]).includes('課長')) {
+    result.customName = String(row[4] || '名無し');
+    result.name = String(row[5] || 'LSI芋虫（幼虫）');
+    result.stage = Number(row[6]) || 0;
+    result.exp = Number(row[7]) || 0;
+    result.points = Number(row[8]) || 0;
+    result.furniture = safeJsonParse(row[9], []);
+    result.equippedFurniture = safeJsonParse(row[10], []);
+    result.discoveredStages = safeJsonParse(row[11], ['LSI芋虫（幼虫）']);
+    result.sprayCount = Number(row[12]) || 0;
+    result.daycareUntil = row[13] || null;
+    result.foodStats = safeJsonParse(row[14], { cabbage: 0, apple: 0, glucose: 0, sugar: 0, twig: 0 });
+    result.formVariant = String(row[15] || 'crystal');
+    result.darlingIncident = row[16] === true || String(row[16]).toLowerCase() === 'true';
+    result.squashCount = Number(row[17]) || 0;
+    result.lastFedAt = String(row[18] || '');
+    result.lastMessageAt = String(row[19] || '');
+    result.readAnnouncements = safeJsonParse(row[21], []);
+    return result;
+  }
+
+  // 列ズレ行のスマート判定 (Heuristic Extraction)
+  const allJsonArrays = [];
+  const allDates = [];
+  const numbers = [];
+
+  for (let c = 4; c < row.length; c++) {
+    const val = row[c];
+    if (val === '' || val === null || val === undefined) continue;
+
+    const strVal = String(val).trim();
+
+    // 1. エサ統計 JSON判定
+    if (strVal.includes('"cabbage"') || strVal.includes('cabbage:')) {
+      result.foodStats = safeJsonParse(strVal, result.foodStats);
+      continue;
+    }
+
+    // 2. ダーリンインシデント判定
+    if (val === true || val === false || strVal.toLowerCase() === 'true' || strVal.toLowerCase() === 'false') {
+      result.darlingIncident = (val === true || strVal.toLowerCase() === 'true');
+      continue;
+    }
+
+    // 3. 形態バリアント判定
+    const variants = ['crystal', 'steel', 'butterfly', 'gold', 'cabbage', 'emoji', 'angel', 'devil'];
+    if (variants.includes(strVal.toLowerCase())) {
+      result.formVariant = strVal.toLowerCase();
+      continue;
+    }
+
+    // 4. JSON配列判定
+    if (strVal.startsWith('[') && strVal.endsWith(']')) {
+      const parsedArr = safeJsonParse(strVal, null);
+      if (Array.isArray(parsedArr)) {
+        if (parsedArr.some(item => typeof item === 'string' && (item.includes('芋虫') || item.includes('幼虫') || item.includes('級') || item.includes('型')))) {
+          result.discoveredStages = parsedArr;
+        } else if (parsedArr.some(item => typeof item === 'string' && item.startsWith('msg_'))) {
+          result.readAnnouncements = parsedArr;
+        } else {
+          allJsonArrays.push(parsedArr);
+        }
+        continue;
+      }
+    }
+
+    // 5. 日付判定
+    if (val instanceof Date || (typeof val === 'string' && (val.includes('2026-') || val.includes('2026/') || val.includes('2025-') || val.includes('2025/')))) {
+      const dateStr = (val instanceof Date) ? Utilities.formatDate(val, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss') : strVal;
+      allDates.push(dateStr);
+      continue;
+    }
+
+    // 6. 数値判定
+    if (typeof val === 'number' || (!isNaN(Number(strVal)) && strVal !== '')) {
+      numbers.push(Number(strVal));
+      continue;
+    }
+
+    // 7. 文字列判定（名前や形態名）
+    if (strVal.includes('芋虫') || strVal.includes('幼虫') || strVal.includes('課長') || strVal.includes('部長')) {
+      result.name = strVal;
+    } else if (result.customName === '名無し' && strVal.length > 0) {
+      result.customName = strVal;
+    }
+  }
+
+  // 家具の割り当て
+  if (allJsonArrays.length >= 2) {
+    result.furniture = allJsonArrays[0];
+    result.equippedFurniture = allJsonArrays[1];
+  } else if (allJsonArrays.length === 1) {
+    result.furniture = allJsonArrays[0];
+    result.equippedFurniture = allJsonArrays[0];
+  }
+
+  // 日付の割り当て
+  if (allDates.length >= 2) {
+    result.lastFedAt = allDates[0];
+    result.lastMessageAt = allDates[1];
+  } else if (allDates.length === 1) {
+    result.lastFedAt = allDates[0];
+    result.lastMessageAt = allDates[0];
+  }
+
+  // 数値の賢い割り当て
+  // stage (0~5), exp (大), points (大), sprayCount (0~99), squashCount (0~999)
+  for (let n of numbers) {
+    if (n >= 0 && n <= 5 && result.stage === 0) {
+      result.stage = n;
+    } else if (n > 50 && result.exp === 0) {
+      result.exp = n;
+    } else if (n > 50 && result.points === 150) {
+      result.points = n;
+    } else if (n < 50 && result.sprayCount === 0) {
+      result.sprayCount = n;
+    } else if (result.squashCount === 0) {
+      result.squashCount = n;
+    }
+  }
+
+  return result;
 }
 
 function safeJsonParse(str, fallback) {
   if (!str) return fallback;
   try {
-    return JSON.parse(str);
+    const parsed = JSON.parse(str);
+    if (Array.isArray(fallback) && !Array.isArray(parsed)) {
+      return fallback;
+    }
+    return parsed;
   } catch (e) {
     return fallback;
   }
 }
 
-function initSheetsIfNeeded(ss) {
-  const headers = [
-    'UID (アカウント識別子)', 
-    '飼育員名', 
-    '自認タイプ', 
-    '個体ID', 
-    '名前・肩書', 
-    '進化段階', 
-    '獲得EXP', 
-    '統制ポイント', 
-    '所有家具 (JSON)', 
-    '設置中家具 (JSON)',
-    'アンロック図鑑 (JSON)',
-    '防虫スプレー回数',
-    '保育園保護期限',
-    'エサ摂取統計 (JSON)',
-    '形態バリアント',
-    'ダーリンインシデント',
-    '潰された回数',
-    '最終給餌日時', 
-    '最終交信日時', 
-    '最終更新日時'
-  ];
+/**
+ * ⚡ 既存データの全自動修復＆整列（バックアップを自動生成してから実行）
+ */
+function autoFixAndMigrateSheetData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_STATUS);
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('シート「' + SHEET_NAME_STATUS + '」が見つかりませんでした。');
+    return;
+  }
 
-  let statusSheet = ss.getSheetByName('個体ステータス_アカウント別');
+  // 1. バックアップを作成
+  const backupSheet = createBackupSheet();
+  
+  // 2. データを全件取得
+  const range = sheet.getDataRange();
+  const values = range.getValues();
+  if (values.length <= 1) {
+    SpreadsheetApp.getUi().alert('データ行が存在しませんでした。');
+    return;
+  }
+
+  // 3. 全行をスマートパースして最新の22列形式に再構築
+  const fixedRows = [STANDARD_HEADERS];
+  const nowStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
+
+  for (let i = 1; i < values.length; i++) {
+    const userObj = parseRowToUserObject(values[i]);
+    const cleanRow = [
+      userObj.uid,
+      userObj.ownerName,
+      userObj.selfType,
+      userObj.id,
+      userObj.customName || '名無し',
+      userObj.name || 'LSI芋虫（幼虫）',
+      userObj.stage,
+      userObj.exp,
+      userObj.points,
+      JSON.stringify(userObj.furniture || []),
+      JSON.stringify(userObj.equippedFurniture || []),
+      JSON.stringify(userObj.discoveredStages || ['LSI芋虫（幼虫）']),
+      userObj.sprayCount,
+      userObj.daycareUntil || '',
+      JSON.stringify(userObj.foodStats || { cabbage: 0, apple: 0, glucose: 0, sugar: 0, twig: 0 }),
+      userObj.formVariant || 'crystal',
+      userObj.darlingIncident ? true : false,
+      userObj.squashCount,
+      userObj.lastFedAt || nowStr,
+      userObj.lastMessageAt || nowStr,
+      nowStr,
+      JSON.stringify(userObj.readAnnouncements || [])
+    ];
+    fixedRows.push(cleanRow);
+  }
+
+  // 4. シートをクリアして整頓されたデータを流し込む
+  sheet.clear();
+  sheet.getRange(1, 1, fixedRows.length, STANDARD_HEADERS.length).setValues(fixedRows);
+  sheet.getRange(1, 1, 1, STANDARD_HEADERS.length).setBackground('#d1fae5').setFontWeight('bold');
+
+  SpreadsheetApp.getUi().alert(
+    '🎉 修復完了！\n' +
+    (fixedRows.length - 1) + ' 件のユーザーデータを最新の22列に綺麗に整頓しました。\n\n' +
+    '※ 元のデータは「' + backupSheet.getName() + '」に保存されていますのでご安心ください。'
+  );
+}
+
+/**
+ * 念のためバックアップシートを作成する関数
+ */
+function createBackupSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_STATUS);
+  if (!sheet) return null;
+
+  const timestamp = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyyMMdd_HHmmss');
+  const backupName = 'バックアップ_' + timestamp;
+  const backupSheet = sheet.copyTo(ss);
+  backupSheet.setName(backupName);
+  return backupSheet;
+}
+
+function initSheetsIfNeeded(ss) {
+  let statusSheet = ss.getSheetByName(SHEET_NAME_STATUS);
   if (!statusSheet) {
-    statusSheet = ss.insertSheet('個体ステータス_アカウント別');
-    statusSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    statusSheet.getRange(1, 1, 1, headers.length).setBackground('#d1fae5').setFontWeight('bold');
-  } else {
-    const currentCols = statusSheet.getLastColumn();
-    // Upgrade existing data to 20 columns if they only have 19 or less
-    if (currentCols < headers.length) {
-      // First, get all data
-      const data = statusSheet.getDataRange().getValues();
-      
-      // Update header
-      statusSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-      statusSheet.getRange(1, 1, 1, headers.length).setBackground('#d1fae5').setFontWeight('bold');
-      
-      // We must insert a blank column for "設置中家具" at column 10 (index 9) for all existing rows 
-      // if they only had 19 columns. But wait, if they have less columns, their data index is shifted!
-      // To be safe, we will just rely on parseRowToUserObject checking row length on read, and saveStatus will overwrite with 20 columns.
-      // But it's better to just insert the missing column so formatting aligns.
-      if (currentCols === 19) {
-        statusSheet.insertColumnBefore(10);
-        statusSheet.getRange(1, 10).setValue('設置中家具 (JSON)');
-      }
-    }
+    statusSheet = ss.insertSheet(SHEET_NAME_STATUS);
+    statusSheet.getRange(1, 1, 1, STANDARD_HEADERS.length).setValues([STANDARD_HEADERS]);
+    statusSheet.getRange(1, 1, 1, STANDARD_HEADERS.length).setBackground('#d1fae5').setFontWeight('bold');
   }
   
-  let noticeSheet = ss.getSheetByName('お知らせ');
+  let noticeSheet = ss.getSheetByName(SHEET_NAME_NOTICE);
   if (!noticeSheet) {
-    noticeSheet = ss.insertSheet('お知らせ');
+    noticeSheet = ss.insertSheet(SHEET_NAME_NOTICE);
     const noticeHeaders = ['ID', '日付', 'タイトル', '本文(改行可)'];
     noticeSheet.getRange(1, 1, 1, noticeHeaders.length).setValues([noticeHeaders]);
     noticeSheet.getRange(1, 1, 1, noticeHeaders.length).setBackground('#fde68a').setFontWeight('bold');
     
     // Add sample announcement
-    noticeSheet.appendRow(['msg_001', Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd'), 'LSI規律お知らせ機能追加', 'お知らせをスプレッドシートから配信できるようになりました。']);
+    noticeSheet.appendRow(['msg_001', Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd'), 'LSI規律お知らせ機能追加', 'お知らせを配信できるようになりました。']);
   }
-  let logSheet = ss.getSheetByName('行動ログ');
+  
+  let logSheet = ss.getSheetByName(SHEET_NAME_LOG);
   if (!logSheet) {
-    logSheet = ss.insertSheet('行動ログ');
+    logSheet = ss.insertSheet(SHEET_NAME_LOG);
     logSheet.getRange(1, 1, 1, 5).setValues([['タイムスタンプ', 'UID', '種別', '観測イベント内容', '獲得EXP']]);
     logSheet.getRange(1, 1, 1, 5).setBackground('#d1fae5').setFontWeight('bold');
   }
   
-  let chatSheet = ss.getSheetByName('交信記録');
+  let chatSheet = ss.getSheetByName(SHEET_NAME_CHAT);
   if (!chatSheet) {
-    chatSheet = ss.insertSheet('交信記録');
+    chatSheet = ss.insertSheet(SHEET_NAME_CHAT);
     chatSheet.getRange(1, 1, 1, 4).setValues([['日時', 'UID', '発信者', '発言内容']]);
     chatSheet.getRange(1, 1, 1, 4).setBackground('#d1fae5').setFontWeight('bold');
   }

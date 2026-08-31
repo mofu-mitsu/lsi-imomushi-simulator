@@ -23,5 +23,26 @@ export const createPool = () => {
   return global._mysqlPool;
 };
 
-const pool = createPool();
-export const db = drizzle(pool, { schema, mode: 'default' });
+let db: any;
+try {
+  const pool = createPool();
+  db = drizzle(pool, { schema, mode: 'default' });
+} catch {
+  console.warn('[AI Studio] Database not connected — using mock');
+  const noOp = { findMany: async () => [], findFirst: async () => null,
+    findUnique: async () => null, create: async (d: any) => d?.data ?? {},
+    update: async (d: any) => d?.data ?? {}, delete: async () => ({}) };
+  
+  const chainable: any = new Proxy(async () => [], {
+    get: (target, prop) => {
+      if (prop === 'then' || prop === 'catch' || prop === 'finally') return target[prop as keyof typeof target];
+      return () => chainable;
+    }
+  });
+
+  db = new Proxy({}, {
+    get: (_, prop) => prop === 'query'
+      ? new Proxy({}, { get: () => noOp }) : () => chainable,
+  });
+}
+export { db };

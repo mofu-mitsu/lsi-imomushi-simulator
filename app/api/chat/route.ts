@@ -19,7 +19,7 @@ function cleanModelResponse(text: string): string {
   return text.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').trim();
 }
 
-async function callGroqWithFallback(systemPrompt: string, userMessage: string, groqApiKey: string): Promise<{ text: string; model: string }> {
+async function callGroqWithFallback(systemPrompt: string, userMessage: string, groqApiKey: string, history: any[] = []): Promise<{ text: string; model: string }> {
   const candidateModels = [
     'openai/gpt-oss-120b',
     'groq/compound',
@@ -29,6 +29,12 @@ async function callGroqWithFallback(systemPrompt: string, userMessage: string, g
 
   for (const model of candidateModels) {
     try {
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        ...history.map(msg => ({ role: msg.role === 'lsi' ? 'assistant' : 'user', content: msg.text })),
+        { role: 'user', content: userMessage }
+      ];
+
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -37,10 +43,7 @@ async function callGroqWithFallback(systemPrompt: string, userMessage: string, g
         },
         body: JSON.stringify({
           model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userMessage }
-          ],
+          messages,
           temperature: 0.7,
           max_tokens: 600,
         }),
@@ -70,20 +73,24 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { 
       message, 
-      stageName = 'LSI芋虫'
+      stageName = 'LSI芋虫',
+      ownerName = '',
+      history = []
     } = body;
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
+    const keeperName = ownerName && ownerName !== '未設定' ? ownerName : '飼育員';
+
     const systemPrompt = `あなたは飼育ケージの中で暮らす「${stageName}」です。
 冷静沈着で理路整然としており、ケージ内の規律・境界線・キャベツの葉脈の秩序を守ることに強いこだわりを持っています。
 
 【対話の絶対ルール】
-1. 報告書や箇条書きの文書（「件名」「1. 概要」など）を作らないでください。飼育員に向けた自然な「芋虫のセリフ」として100〜200文字程度で返答してください。
+1. 報告書や箇条書きの文書（「件名」「1. 概要」など）を作らないでください。相手に向けた自然な「芋虫のセリフ」として100〜200文字程度で返答してください。
 2. 「Fe」「1F」「2V」「LSI」「ソシオニクス」「心理機能」「パラメータ」といった専門用語・型記号を絶対に直接発言しないでください。
-3. 相手のことは「飼育員」「貴殿」と呼び、冷静かつ理詰めの口調（「〜だ」「〜せよ」「〜と判断する」）で話してください。
+3. 相手のことは「${keeperName}」「貴殿」と呼び、冷静かつ理詰めの口調（「〜だ」「〜せよ」「〜と判断する」）で話してください。
 4. 芋虫らしい仕草描写（「モゾ…」「（葉を咀嚼）」「（境界線を凝視）」など）を自然に交えてください。`;
 
     let aiMessage = '';
@@ -92,7 +99,7 @@ export async function POST(req: NextRequest) {
     // 1. Try Groq first for ultra-fast LPU response speed
     if (process.env.GROQ_API_KEY) {
       try {
-        const groqResult = await callGroqWithFallback(systemPrompt, message, process.env.GROQ_API_KEY);
+        const groqResult = await callGroqWithFallback(systemPrompt, message, process.env.GROQ_API_KEY, history);
         aiMessage = groqResult.text;
         provider = `Groq (${groqResult.model})`;
       } catch (e: any) {
@@ -108,9 +115,17 @@ export async function POST(req: NextRequest) {
       if (ai) {
         for (const model of geminiModels) {
           try {
+            const contents = [
+              ...history.map((msg: any) => ({
+                role: msg.role === 'lsi' ? 'model' : 'user',
+                parts: [{ text: msg.text }]
+              })),
+              { role: 'user', parts: [{ text: message }] }
+            ];
+
             const response = await ai.models.generateContent({
               model,
-              contents: message,
+              contents,
               config: {
                 systemInstruction: systemPrompt,
                 temperature: 0.8,

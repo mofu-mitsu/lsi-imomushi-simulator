@@ -3,6 +3,7 @@ export interface CaterpillarData {
   selfType: string;
   id: string;
   name: string;
+  customName?: string;
   stage: number;
   exp: number;
   points: number;
@@ -29,9 +30,10 @@ export interface CaterpillarData {
   };
   formVariant?: string;
   evolutionBranch?: string;
+  readAnnouncements?: string[];
 }
 
-export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzwLpEzIBRYwqgYdjQBs15oCD41lExD4PVJiA1dNDIWbvF3p7G7Ks8A_dbUwt1BJCiXgg/exec';
+export const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwhZhzNmO8yv_pS7eYchCzPyU4QwkHCapO4J8HXUwJ9z5XPUZEQLk0aFYEFGX1RrZsPqA/exec';
 
 // Generate or retrieve unique guest UID per browser/device
 export function getOrCreateGuestUid(): string {
@@ -80,7 +82,8 @@ export const DEFAULT_CATERPILLAR_DATA: CaterpillarData = {
     sugar: 0,
     twig: 0
   },
-  formVariant: 'crystal'
+  formVariant: 'crystal',
+  readAnnouncements: []
 };
 
 // Load status from user's Google Apps Script (GAS) Web App
@@ -143,12 +146,13 @@ export async function syncWithGas(
           ownerName: data.ownerName,
           selfType: data.selfType,
           id: data.id,
-          name: data.name,
+          customName: data.customName || '名無し',
+          name: data.name || 'LSI芋虫（幼虫）',
           stage: data.stage,
           exp: data.exp,
           points: data.points,
           furniture: data.furniture,
-          equippedFurniture: data.equippedFurniture || data.furniture,
+          equippedFurniture: data.equippedFurniture || [],
           discoveredStages: data.discoveredStages || ['LSI芋虫（幼虫）'],
           lastFedAt: data.lastFedAt,
           lastMessageAt: data.lastMessageAt,
@@ -159,7 +163,8 @@ export async function syncWithGas(
           darlingMoodTarget: data.darlingMoodTarget || 50,
           foodStats: data.foodStats || { cabbage: 0, apple: 0, glucose: 0, sugar: 0, twig: 0 },
           formVariant: data.formVariant || 'crystal',
-          squashCount: data.squashCount || 0
+          squashCount: data.squashCount || 0,
+          readAnnouncements: data.readAnnouncements || []
         }
       })
     });

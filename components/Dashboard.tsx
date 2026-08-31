@@ -454,7 +454,6 @@ export default function Dashboard() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [showAnnouncementsModal, setShowAnnouncementsModal] = useState(false);
-  const [lastReadAnnouncementId, setLastReadAnnouncementId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'status' | 'observation' | 'shop' | 'training' | 'chat'>('status');
   
   // Modals
@@ -469,6 +468,7 @@ export default function Dashboard() {
   // Editing profile temporary states
   const [tempName, setTempName] = useState('');
   const [tempType, setTempType] = useState('');
+  const [tempCatName, setTempCatName] = useState('');
   const [copiedShare, setCopiedShare] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
@@ -486,14 +486,6 @@ export default function Dashboard() {
   const [showAdoptModal, setShowAdoptModal] = useState(false);
   const [showNotReadyModal, setShowNotReadyModal] = useState(false);
 
-  const hasUnreadAnnouncements = announcements.length > 0 && announcements[0].id !== lastReadAnnouncementId;
-  const handleOpenAnnouncements = () => {
-    setShowAnnouncementsModal(true);
-    if (announcements.length > 0) {
-      setLastReadAnnouncementId(announcements[0].id);
-      localStorage.setItem('lsi_last_read_announcement', announcements[0].id);
-    }
-  };
   const [adoptPhase, setAdoptPhase] = useState<0|1|2|3|4|5>(0);
 
   // Shop clerk dialogue state
@@ -502,7 +494,7 @@ export default function Dashboard() {
   const rollClerkQuote = useCallback(() => {
     const random = CLERK_QUOTES[Math.floor(Math.random() * CLERK_QUOTES.length)];
     setClerkQuote(random);
-  }, []);
+  }, [setClerkQuote]);
 
   // Safe initial local data fetcher
   const [data, setData] = useState<CaterpillarData>(() => {
@@ -516,10 +508,14 @@ export default function Dashboard() {
           const { stageInfo, stageIdx, formVariant } = getFormStageInfo(exp, parsed.foodStats);
           const discovered = Array.from(new Set([...(parsed.discoveredStages || []), stageInfo.name]));
           
+          const isStageName = STAGES.some(s => s.name === parsed.name);
+          const customName = (parsed.name && !isStageName) ? parsed.name : parsed.customName;
+
           return {
             ...DEFAULT_CATERPILLAR_DATA,
             ...parsed,
             name: stageInfo.name,
+            customName: customName,
             stage: stageIdx,
             formVariant: formVariant,
             gasWebAppUrl: DEFAULT_GAS_URL,
@@ -545,6 +541,18 @@ export default function Dashboard() {
     }
     return DEFAULT_CATERPILLAR_DATA;
   });
+
+  const hasUnreadAnnouncements = announcements.some(ann => !(data.readAnnouncements || []).includes(ann.id));
+  const handleOpenAnnouncements = () => {
+    setShowAnnouncementsModal(true);
+    if (announcements.length > 0) {
+      const allIds = announcements.map(a => a.id);
+      setData(prev => ({
+        ...prev,
+        readAnnouncements: Array.from(new Set([...(prev.readAnnouncements || []), ...allIds]))
+      }));
+    }
+  };
 
   // Save to localStorage whenever data changes
   useEffect(() => {
@@ -605,11 +613,14 @@ export default function Dashboard() {
             const foodStats = fetched.foodStats || { cabbage: 0, apple: 0, glucose: 0, sugar: 0, twig: 0 };
             const { stageInfo, stageIdx, formVariant } = getFormStageInfo(exp, foodStats);
             const discovered = Array.from(new Set([...(fetched.discoveredStages || []), stageInfo.name]));
+            const isStageName = STAGES.some(s => s.name === fetched.name);
+            const customName = (fetched.name && !isStageName) ? fetched.name : fetched.customName;
 
             setData(prev => ({
               ...prev,
               ...fetched,
               name: stageInfo.name,
+              customName: customName,
               stage: stageIdx,
               formVariant: fetched.formVariant || formVariant,
               discoveredStages: discovered,
@@ -641,6 +652,21 @@ export default function Dashboard() {
       }
     });
     return () => unsubscribe();
+  }, []);
+
+  // Fetch announcements on mount
+  useEffect(() => {
+    async function fetchAnnouncements() {
+      try {
+        const res = await fetchAnnouncementsFromGas(DEFAULT_GAS_URL);
+        if (res.success && res.data) {
+          setAnnouncements(res.data);
+        }
+      } catch (e) {
+        console.error('Failed to fetch announcements:', e);
+      }
+    }
+    fetchAnnouncements();
   }, []);
 
   // Sync to GAS Helper
@@ -717,11 +743,14 @@ export default function Dashboard() {
           const stageIdx = STAGES.reduce((acc, stage, idx) => exp >= stage.threshold ? idx : acc, 0);
           const stageInfo = STAGES[stageIdx];
           const discovered = Array.from(new Set([...(fetched.discoveredStages || []), stageInfo.name]));
+          const isStageName = STAGES.some(s => s.name === fetched.name);
+          const customName = (fetched.name && !isStageName) ? fetched.name : fetched.customName;
 
           const updated = {
             ...DEFAULT_CATERPILLAR_DATA,
             ...fetched,
             name: stageInfo.name,
+            customName: customName,
             stage: stageIdx,
             discoveredStages: discovered,
             uid: user.uid,
@@ -1190,7 +1219,9 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
+          history: chatMessages.slice(-6).map(m => ({ role: m.role, text: m.text })),
           stageName: data.name,
+          caterpillarName: data.customName,
           stage: data.stage,
           exp: data.exp,
           ownerName: data.ownerName,
@@ -1216,7 +1247,8 @@ export default function Dashboard() {
 
   // Share text generation
   const getShareText = () => {
-    return `🐛【LSI芋虫観察日記】\n現在の形態: ${data.name}\n規律EXP: ${data.exp} | 保有コイン: ${data.points}pt\n飼育員: ${data.ownerName} (${data.selfType})\n#LSI芋虫 #ソシオニクス #MBTI`;
+    const displayName = data.customName ? `${data.customName} (${data.name})` : data.name;
+    return `🐛【LSI芋虫観察日記】\n現在の形態: ${displayName}\n規律EXP: ${data.exp} | 保有コイン: ${data.points}pt\n飼育員: ${data.ownerName} (${data.selfType})\n#LSI芋虫 #ソシオニクス #MBTI`;
   };
 
   const handleShareTwitter = () => {
@@ -1287,6 +1319,18 @@ export default function Dashboard() {
           {/* Desktop Navigation & Actions */}
           <div className="hidden md:flex items-center gap-2 shrink-0">
             
+            {/* Announcements Button */}
+            <button
+              onClick={handleOpenAnnouncements}
+              className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-800 text-xs font-bold transition shadow-xs cursor-pointer"
+            >
+              <Bell className="w-3.5 h-3.5" />
+              <span>お知らせ</span>
+              {hasUnreadAnnouncements && (
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+              )}
+            </button>
+
             {/* How to play Button */}
             <button
               onClick={() => setIsHelpModalOpen(true)}
@@ -1319,6 +1363,7 @@ export default function Dashboard() {
               onClick={() => {
                 setTempName(data.ownerName);
                 setTempType(data.selfType);
+                setTempCatName(data.customName || '');
                 setIsProfileModalOpen(true);
               }}
               className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-700 transition cursor-pointer"
@@ -1504,9 +1549,12 @@ export default function Dashboard() {
                 </div>
 
                 <div>
-                  <h2 className="text-lg font-black text-stone-900 flex items-center gap-1.5">
+                  <h2 className="text-lg font-black text-stone-900 flex items-center gap-1.5 flex-wrap">
                     <span>{currentStage.visual}</span>
-                    <span>{currentStage.name}</span>
+                    <span>{data.customName ? `${data.customName}` : currentStage.name}</span>
+                    {data.customName && (
+                      <span className="text-xs text-stone-500 font-bold ml-1">({currentStage.name})</span>
+                    )}
                   </h2>
                   <p className="text-xs text-stone-500 font-medium mt-1 leading-relaxed">
                     {currentStage.desc}
@@ -1567,6 +1615,7 @@ export default function Dashboard() {
                     onClick={() => {
                       setTempName(data.ownerName);
                       setTempType(data.selfType);
+                      setTempCatName(data.customName || '');
                       setIsProfileModalOpen(true);
                     }}
                     className="text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1 cursor-pointer"
@@ -2151,7 +2200,7 @@ export default function Dashboard() {
                         <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
                           {ann.date}
                         </span>
-                        {idx === 0 && ann.id !== lastReadAnnouncementId && (
+                        {!(data.readAnnouncements || []).includes(ann.id) && (
                           <span className="text-[10px] font-black text-red-500 flex items-center gap-1">
                             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
                             NEW
@@ -2314,6 +2363,16 @@ export default function Dashboard() {
               
               <div className="flex flex-col gap-3 text-xs">
                 <div>
+                  <label className="font-bold text-stone-600 mb-1 block">芋虫の個体名（任意）</label>
+                  <input
+                    type="text"
+                    value={tempCatName}
+                    onChange={(e) => setTempCatName(e.target.value)}
+                    placeholder="例: キャベツ太郎"
+                    className="w-full bg-stone-50 border-2 border-stone-300 rounded-xl px-3 py-2 text-stone-900 font-bold focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+                <div>
                   <label className="font-bold text-stone-600 mb-1 block">飼育員名（呼び名）</label>
                   <input
                     type="text"
@@ -2347,7 +2406,8 @@ export default function Dashboard() {
                     const updated = {
                       ...data,
                       ownerName: tempName.trim() || '飼育員',
-                      selfType: tempType.trim() || '未設定'
+                      selfType: tempType.trim() || '未設定',
+                      customName: tempCatName.trim() || undefined
                     };
                     setData(updated);
                     triggerGasSync(updated);
@@ -2539,6 +2599,7 @@ export default function Dashboard() {
                       setIsMobileMenuOpen(false);
                       setTempName(data.ownerName);
                       setTempType(data.selfType);
+                      setTempCatName(data.customName || '');
                       setIsProfileModalOpen(true);
                     }}
                     className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-stone-100 text-stone-800 text-xs font-bold text-left cursor-pointer"
