@@ -2177,7 +2177,7 @@ export default function Dashboard() {
               exit={{ scale: 0.95, opacity: 0 }}
               className="bg-white border-2 border-stone-300 rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl flex flex-col gap-4 max-h-[85vh] overflow-y-auto"
             >
-              <div className="flex items-center justify-between border-b-2 border-stone-100 pb-3">
+              <div className="flex items-center justify-between border-b-2 border-stone-100 pb-3 shrink-0">
                 <h3 className="text-lg font-black text-stone-900 flex items-center gap-2">
                   <Bell className="w-5 h-5 text-emerald-700" />
                   <span>運営からのお知らせ</span>
@@ -2190,12 +2190,12 @@ export default function Dashboard() {
                 </button>
               </div>
 
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3 overflow-y-auto max-h-[55vh] pr-1.5 scrollbar-thin">
                 {announcements.length === 0 ? (
                   <p className="text-sm text-stone-500 font-bold text-center py-8">現在お知らせはありません。</p>
                 ) : (
                   announcements.map((ann, idx) => (
-                    <div key={ann.id} className="bg-stone-50 border border-stone-200 rounded-xl p-4 flex flex-col gap-2">
+                    <div key={ann.id} className="bg-stone-50 border border-stone-200 rounded-xl p-4 flex flex-col gap-2 transition hover:border-emerald-200">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
                           {ann.date}
@@ -2218,7 +2218,7 @@ export default function Dashboard() {
 
               <button
                 onClick={() => setShowAnnouncementsModal(false)}
-                className="w-full bg-stone-800 hover:bg-stone-700 text-white font-black py-3.5 rounded-xl shadow-xs transition active:scale-95 cursor-pointer mt-2"
+                className="w-full bg-stone-800 hover:bg-stone-700 text-white font-black py-3.5 rounded-xl shadow-xs transition active:scale-95 cursor-pointer mt-2 shrink-0"
               >
                 閉じる
               </button>
